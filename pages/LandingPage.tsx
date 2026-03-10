@@ -1,13 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Menu, PlayCircle, TrendingUp, Star, Users, BookOpen } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
-import { COURSES } from '../constants';
+import { Course } from '../types';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface LandingPageProps {
   onNavigate: (page: string) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
+  const [featuredCourses, setFeaturedCourses] = useState<Course[]>([]);
+
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      try {
+        const q = query(collection(db, 'courses'), limit(4));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const mapped = snapshot.docs.map(doc => ({ id: String(doc.id), ...doc.data() } as Course));
+          setFeaturedCourses(mapped);
+        } else {
+          setFeaturedCourses([]);
+        }
+      } catch (error) {
+        console.error('Fetch featured courses error', error);
+      }
+    };
+    fetchFeatured();
+  }, []);
   return (
     <div className="min-h-screen flex flex-col font-display bg-[#f5f7f8] dark:bg-[#101922]">
       {/* Header */}
@@ -20,13 +42,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               </div>
               <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Edu Platform</span>
             </button>
-            
+
             <div className="hidden md:flex max-w-md">
               <div className="relative w-full">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Search className="text-slate-400" size={20} />
                 </div>
-                <input 
+                <input
                   type="text"
                   className="block w-full rounded-full border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg py-2 pl-10 pr-4 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none min-w-[300px]"
                   placeholder="Tìm khóa học, giảng viên..."
@@ -42,13 +64,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               <button className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-primary transition-colors">Liên hệ</button>
             </nav>
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => onNavigate('auth')}
                 className="hidden sm:inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 dark:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
                 Đăng nhập
               </button>
-              <button 
+              <button
                 onClick={() => onNavigate('auth')}
                 className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover transition-colors"
               >
@@ -86,11 +108,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   </button>
                 </div>
               </div>
-              
+
               <div className="relative lg:order-last">
                 <div className="relative aspect-square w-full max-w-lg mx-auto lg:max-w-none rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-primary/20 to-purple-500/20">
                   <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://picsum.photos/seed/student/800/800')" }}></div>
-                  
+
                   {/* Floating Stats */}
                   <div className="absolute bottom-6 left-6 right-6 bg-white/90 dark:bg-dark-card/90 backdrop-blur p-4 rounded-2xl shadow-lg border border-gray-100 dark:border-dark-border flex items-center gap-4 animate-bounce duration-[3000ms]">
                     <div className="size-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
@@ -156,9 +178,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 <TrendingUp size={16} />
               </button>
             </div>
-            
+
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {COURSES.map(course => (
+              {featuredCourses.map(course => (
                 <div key={course.id} onClick={() => onNavigate('checkout')} className="cursor-pointer h-full">
                   <CourseCard course={course} />
                 </div>

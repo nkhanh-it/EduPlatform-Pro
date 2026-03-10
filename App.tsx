@@ -12,62 +12,91 @@ import Auth from './pages/Auth';
 import Courses from './pages/Courses';
 import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
+import { AuthProvider, useAuth } from './AuthContext';
+import { addTestUser, fetchUsersFromFirestore } from './testFirebase';
+import { seedDefaultAdmin } from './seedAdmin';
 
 type Page = 'landing' | 'student-dashboard' | 'student-courses' | 'course-player' | 'admin-dashboard' | 'admin-students' | 'admin-courses' | 'admin-registrations' | 'admin-revenue' | 'auth' | 'courses' | 'checkout' | 'settings';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
+  const { isAuthenticated, user, isLoading } = useAuth();
+
+  React.useEffect(() => {
+    // Automatically test reading from Firestore on load
+    fetchUsersFromFirestore();
+    // Seed default admin account if not exists
+    seedDefaultAdmin();
+  }, []);
+
+  React.useEffect(() => {
+    // Automatically redirect to dashboard if authenticated but stuck on auth page
+    if (isAuthenticated && currentPage === 'auth') {
+      setCurrentPage(user?.role === 'admin' ? 'admin-dashboard' : 'student-dashboard');
+    }
+  }, [isAuthenticated, user, currentPage]);
+
+  // Prevent rendering app contents while restoring session
+  if (isLoading) {
+    return <div className="h-screen w-screen flex items-center justify-center bg-white dark:bg-[#101922]">
+      <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+    </div>;
+  }
 
   const handleNavigate = (page: string) => {
+    // Enforce basic routing restrictions
+    if (!isAuthenticated && !['landing', 'auth', 'courses'].includes(page)) {
+      setCurrentPage('auth');
+      return;
+    }
+
+    // Send admin users away from student specific layouts if missing rules implemented,
+    // although keeping it simple for now as demonstration restricts flow easily
     setCurrentPage(page as Page);
+  };
+
+  const handleFirebaseTest = async () => {
+    try {
+      const id = await addTestUser();
+      console.log('Firebase test user added with id:', id);
+      alert(`Firebase OK. Created user id: ${id}`);
+    } catch (error) {
+      console.error('Firebase test failed:', error);
+      alert('Firebase test failed. Check console and Firestore rules.');
+    }
   };
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'landing':
-        return <LandingPage onNavigate={handleNavigate} />;
-      case 'auth':
-        return <Auth onNavigate={handleNavigate} />;
-      case 'student-dashboard':
-        return <StudentDashboard onNavigate={handleNavigate} />;
-      case 'student-courses':
-        return <StudentCourses onNavigate={handleNavigate} />;
-      case 'course-player':
-        return <CoursePlayer onNavigate={handleNavigate} />;
-      case 'courses':
-        return <Courses onNavigate={handleNavigate} />;
-      case 'checkout':
-        return <Checkout onNavigate={handleNavigate} />;
-      case 'settings':
-        return <Settings onNavigate={handleNavigate} />;
-      case 'admin-dashboard':
-        return <AdminDashboard onNavigate={handleNavigate} />;
-      case 'admin-students':
-        return <StudentList onNavigate={handleNavigate} />;
-      case 'admin-courses':
-        return <AdminCourses onNavigate={handleNavigate} />;
-      case 'admin-registrations':
-        return <AdminRegistrations onNavigate={handleNavigate} />;
-      case 'admin-revenue':
-        return <AdminRevenue onNavigate={handleNavigate} />;
-      default:
-        return <LandingPage onNavigate={handleNavigate} />;
+      case 'landing': return <LandingPage onNavigate={handleNavigate} />;
+      case 'auth': return <Auth onNavigate={handleNavigate} />;
+      case 'student-dashboard': return <StudentDashboard onNavigate={handleNavigate} />;
+      case 'student-courses': return <StudentCourses onNavigate={handleNavigate} />;
+      case 'course-player': return <CoursePlayer onNavigate={handleNavigate} />;
+      case 'courses': return <Courses onNavigate={handleNavigate} />;
+      case 'checkout': return <Checkout onNavigate={handleNavigate} />;
+      case 'settings': return <Settings onNavigate={handleNavigate} />;
+      case 'admin-dashboard': return <AdminDashboard onNavigate={handleNavigate} />;
+      case 'admin-students': return <StudentList onNavigate={handleNavigate} />;
+      case 'admin-courses': return <AdminCourses onNavigate={handleNavigate} />;
+      case 'admin-registrations': return <AdminRegistrations onNavigate={handleNavigate} />;
+      case 'admin-revenue': return <AdminRevenue onNavigate={handleNavigate} />;
+      default: return <LandingPage onNavigate={handleNavigate} />;
     }
   };
 
   return (
     <>
-      {/* Dev Navigation Bar for easy switching in preview */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] bg-black/80 backdrop-blur text-white px-4 py-2 rounded-full flex gap-4 shadow-xl text-xs font-medium border border-white/10 overflow-x-auto max-w-[90vw] whitespace-nowrap">
-        <button onClick={() => setCurrentPage('landing')} className={currentPage === 'landing' ? 'text-primary' : 'hover:text-gray-300'}>Landing</button>
-        <button onClick={() => setCurrentPage('auth')} className={currentPage === 'auth' ? 'text-primary' : 'hover:text-gray-300'}>Auth</button>
-        <button onClick={() => setCurrentPage('student-dashboard')} className={currentPage === 'student-dashboard' ? 'text-primary' : 'hover:text-gray-300'}>Dashboard</button>
-        <button onClick={() => setCurrentPage('student-courses')} className={currentPage === 'student-courses' ? 'text-primary' : 'hover:text-gray-300'}>My Courses</button>
-        <button onClick={() => setCurrentPage('admin-dashboard')} className={currentPage === 'admin-dashboard' ? 'text-primary' : 'hover:text-gray-300'}>Admin</button>
-      </div>
-      
       {renderPage()}
     </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
