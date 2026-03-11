@@ -12,14 +12,16 @@ import Auth from './pages/Auth';
 import Courses from './pages/Courses';
 import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
+import StudentProfile from './pages/StudentProfile';
 import { AuthProvider, useAuth } from './AuthContext';
 import { addTestUser, fetchUsersFromFirestore } from './testFirebase';
 import { seedDefaultAdmin } from './seedAdmin';
 
-type Page = 'landing' | 'student-dashboard' | 'student-courses' | 'course-player' | 'admin-dashboard' | 'admin-students' | 'admin-courses' | 'admin-registrations' | 'admin-revenue' | 'auth' | 'courses' | 'checkout' | 'settings';
+type Page = 'landing' | 'student-dashboard' | 'student-courses' | 'course-player' | 'admin-dashboard' | 'admin-students' | 'admin-courses' | 'admin-registrations' | 'admin-revenue' | 'auth' | 'courses' | 'checkout' | 'settings' | 'student-profile-view' | 'student-profile-edit';
 
 const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const { isAuthenticated, user, isLoading } = useAuth();
 
   React.useEffect(() => {
@@ -50,8 +52,14 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // Send admin users away from student specific layouts if missing rules implemented,
-    // although keeping it simple for now as demonstration restricts flow easily
+    // Parse studentId from page string if present (e.g. 'student-profile-view:abc123')
+    if (page.startsWith('student-profile-view:') || page.startsWith('student-profile-edit:')) {
+      const [pageName, studentId] = page.split(':');
+      setSelectedStudentId(studentId);
+      setCurrentPage(pageName as Page);
+      return;
+    }
+
     setCurrentPage(page as Page);
   };
 
@@ -78,6 +86,8 @@ const AppContent: React.FC = () => {
       case 'settings': return <Settings onNavigate={handleNavigate} />;
       case 'admin-dashboard': return <AdminDashboard onNavigate={handleNavigate} />;
       case 'admin-students': return <StudentList onNavigate={handleNavigate} />;
+      case 'student-profile-view': return selectedStudentId ? <StudentProfile studentId={selectedStudentId} mode="view" onNavigate={handleNavigate} /> : <StudentList onNavigate={handleNavigate} />;
+      case 'student-profile-edit': return selectedStudentId ? <StudentProfile studentId={selectedStudentId} mode="edit" onNavigate={handleNavigate} /> : <StudentList onNavigate={handleNavigate} />;
       case 'admin-courses': return <AdminCourses onNavigate={handleNavigate} />;
       case 'admin-registrations': return <AdminRegistrations onNavigate={handleNavigate} />;
       case 'admin-revenue': return <AdminRevenue onNavigate={handleNavigate} />;

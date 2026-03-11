@@ -7,10 +7,15 @@ import com.eduplatform.exception.ResourceNotFoundException;
 import com.eduplatform.repository.EnrollmentRepository;
 import com.eduplatform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -44,10 +49,14 @@ public class UserService {
 
     @Transactional
     public void updateProfile(User user, UpdateProfileRequest request) {
-        if (request.getName() != null) user.setName(request.getName());
-        if (request.getDisplayName() != null) user.setDisplayName(request.getDisplayName());
-        if (request.getBio() != null) user.setBio(request.getBio());
-        if (request.getPhone() != null) user.setPhone(request.getPhone());
+        if (request.getName() != null)
+            user.setName(request.getName());
+        if (request.getDisplayName() != null)
+            user.setDisplayName(request.getDisplayName());
+        if (request.getBio() != null)
+            user.setBio(request.getBio());
+        if (request.getPhone() != null)
+            user.setPhone(request.getPhone());
         userRepository.save(user);
     }
 
@@ -62,6 +71,44 @@ public class UserService {
 
     // === Admin: Student Management ===
 
+    public StudentPageResponse getStudentsPaginated(String search, String status,
+            String startDate, String endDate,
+            int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "joinDate"));
+
+        User.Status statusEnum = null;
+        if (status != null && !status.isBlank()) {
+            statusEnum = User.Status.valueOf(status.toUpperCase());
+        }
+
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+
+        LocalDate start = null;
+        LocalDate end = null;
+        if (startDate != null && !startDate.isBlank()) {
+            start = LocalDate.parse(startDate);
+        }
+        if (endDate != null && !endDate.isBlank()) {
+            end = LocalDate.parse(endDate);
+        }
+
+        Page<User> userPage = userRepository.findStudentsFiltered(
+                User.Role.STUDENT, statusEnum, searchParam, start, end, pageable);
+
+        List<UserResponse> content = userPage.getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return StudentPageResponse.builder()
+                .content(content)
+                .currentPage(userPage.getNumber())
+                .pageSize(userPage.getSize())
+                .totalElements(userPage.getTotalElements())
+                .totalPages(userPage.getTotalPages())
+                .build();
+    }
+
+    // Keep old method for backward compat
     public List<UserResponse> getAllStudents(String search, String status) {
         List<User> students;
 
@@ -85,19 +132,21 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse createStudent(String name, String email, String phone) {
+    public UserResponse createStudent(String name, String email, String phone, String password) {
         if (userRepository.existsByEmail(email)) {
             throw new BadRequestException("Email đã tồn tại");
         }
 
+        String pwd = (password != null && !password.isBlank()) ? password : "123456";
+
         User user = User.builder()
                 .name(name)
                 .email(email)
-                .password(passwordEncoder.encode("123456"))
+                .password(passwordEncoder.encode(pwd))
                 .phone(phone != null ? phone : "")
                 .role(User.Role.STUDENT)
                 .status(User.Status.ACTIVE)
-                .avatar("https://picsum.photos/seed/" + email + "/100/100")
+                .avatar("https://ui-avatars.com/api/?name=" + name.replace(" ", "+") + "&background=6366f1&color=fff")
                 .build();
 
         userRepository.save(user);
@@ -109,11 +158,36 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên với id: " + id));
 
-        if (name != null) user.setName(name);
-        if (email != null) user.setEmail(email);
-        if (phone != null) user.setPhone(phone);
+        if (name != null)
+            user.setName(name);
+        if (email != null)
+            user.setEmail(email);
+        if (phone != null)
+            user.setPhone(phone);
         userRepository.save(user);
         return toResponse(user);
+    }
+
+    @Transactional
+    public void deleteStudent(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên với id: " + id));
+        userRepository.delete(user);
+    }
+
+    @Transactional
+    public void bulkDelete(List<Long> ids) {
+        List<User> users = userRepository.findAllById(ids);
+        userRepository.deleteAll(users);
+    }
+
+    @Transactional
+    public void bulkLock(List<Long> ids) {
+        List<User> users = userRepository.findAllById(ids);
+        for (User user : users) {
+            user.setStatus(User.Status.LOCKED);
+        }
+        userRepository.saveAll(users);
     }
 
     @Transactional
