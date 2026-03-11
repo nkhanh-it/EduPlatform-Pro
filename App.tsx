@@ -14,7 +14,6 @@ import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
 import StudentProfile from './pages/StudentProfile';
 import { AuthProvider, useAuth } from './AuthContext';
-import { addTestUser, fetchUsersFromFirestore } from './testFirebase';
 import { seedDefaultAdmin } from './seedAdmin';
 
 type Page = 'landing' | 'student-dashboard' | 'student-courses' | 'course-player' | 'admin-dashboard' | 'admin-students' | 'admin-courses' | 'admin-registrations' | 'admin-revenue' | 'auth' | 'courses' | 'checkout' | 'settings' | 'student-profile-view' | 'student-profile-edit';
@@ -25,8 +24,6 @@ const AppContent: React.FC = () => {
   const { isAuthenticated, user, isLoading } = useAuth();
 
   React.useEffect(() => {
-    // Automatically test reading from Firestore on load
-    fetchUsersFromFirestore();
     // Seed default admin account if not exists
     seedDefaultAdmin();
   }, []);
