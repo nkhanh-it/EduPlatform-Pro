@@ -4,23 +4,28 @@ export interface Course {
   instructor: string;
   thumbnail: string;
   category: string;
+  description?: string | null;
   rating: number;
   reviews: number;
   price: number;
-  originalPrice: number;
+  originalPrice?: number | null;
   progress?: number;
   totalLessons?: number;
   completedLessons?: number;
+  published?: boolean;
 }
 
 export interface User {
   id: string;
-  name: string;
+  name?: string;
+  fullName?: string;
+  displayName?: string;
   email: string;
-  avatar: string;
-  role: 'student' | 'admin';
+  avatar?: string;
+  avatarUrl?: string;
+  role: 'student' | 'admin' | 'STUDENT' | 'ADMIN';
   joinDate: string;
-  status: 'active' | 'inactive' | 'pending' | 'locked';
+  status: 'active' | 'inactive' | 'pending' | 'locked' | 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'LOCKED';
   coursesEnrolled?: number;
   phone?: string;
 }
@@ -32,6 +37,24 @@ export interface Transaction {
   date: string;
   amount: number;
   status: 'success' | 'pending' | 'failed';
+}
+
+export interface Enrollment {
+  id: string;
+  course: Course;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  progressPercent: number;
+  completedLessons: number;
+  totalLessons: number;
+  enrolledAt: string;
+}
+
+export interface Lesson {
+  id: string;
+  title: string;
+  orderIndex: number;
+  durationSeconds: number;
+  preview: boolean;
 }
 
 export interface Stat {
