@@ -1,183 +1,264 @@
-import React from 'react';
-import { 
-  Bell, 
-  Calendar, 
-  Download,
-  TrendingUp,
-  DollarSign,
-  CreditCard,
-  Wallet,
-  ArrowUpRight,
-  ArrowDownRight
-} from 'lucide-react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { Bell, Calendar, Download, TrendingUp, CreditCard, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts';
 import Sidebar from '../components/Sidebar';
-import { REVENUE_DATA } from '../constants';
+import { adminGetRevenuePoints, adminGetRevenueSummary, adminGetTransactions } from '../api';
+import { showInfoToast, showSuccessToast } from '../components/feedback/ToastProvider';
 
 interface AdminRevenueProps {
   onNavigate: (page: string) => void;
 }
 
 const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
-  return (
-    <div className="flex h-screen bg-[#f5f7f8] dark:bg-[#101922] text-slate-900 dark:text-white overflow-hidden">
-      <Sidebar role="admin" activePage="admin-revenue" onNavigate={onNavigate} />
+  const [summary, setSummary] = useState<any | null>(null);
+  const [points, setPoints] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
+  const [periodDays, setPeriodDays] = useState<30 | 90 | 365>(30);
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <header className="sticky top-0 z-50 flex items-center justify-between border-b border-gray-200 dark:border-dark-border bg-white/90 dark:bg-dark-card/90 backdrop-blur-md px-6 py-3">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold leading-tight">Tài chính & Doanh thu</h2>
-          </div>
-          <div className="flex flex-1 justify-end gap-6 items-center">
-            <button className="relative text-slate-500 hover:text-primary transition-colors">
-               <Bell size={20} />
-            </button>
-            <div className="flex items-center gap-3">
-               <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold leading-none">Admin User</p>
-                  <p className="text-xs text-slate-500 mt-1">Quản trị viên</p>
-               </div>
-               <div className="size-10 rounded-full bg-cover bg-center border-2 border-gray-200 dark:border-dark-border" style={{ backgroundImage: 'url(https://picsum.photos/seed/admin/100/100)' }}></div>
+  const filteredTransactions = useMemo(() => {
+    const now = Date.now();
+    return transactions.filter((tx) => {
+      const createdAt = new Date(tx.createdAt).getTime();
+      return Number.isFinite(createdAt) && now - createdAt <= periodDays * 24 * 60 * 60 * 1000;
+    });
+  }, [transactions, periodDays]);
+
+  const filteredPoints = useMemo(() => (periodDays === 365 ? points : points.slice(-(periodDays === 30 ? 6 : 12))), [periodDays, points]);
+
+  const handleExport = () => {
+    const headers = ['id', 'userId', 'courseTitle', 'amount', 'status', 'method', 'createdAt'];
+    const rows = filteredTransactions.map((t) => [t.id, t.userId, t.courseTitle, t.amount, t.status, t.method, t.createdAt]);
+    const csv = [headers, ...rows].map((row) => row.map((v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'revenue-transactions.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    showSuccessToast('Cập nhật thành công');
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setSummary(await adminGetRevenueSummary());
+      } catch {
+        setSummary(null);
+      }
+      try {
+        setPoints(await adminGetRevenuePoints());
+      } catch {
+        setPoints([]);
+      }
+      try {
+        setTransactions(await adminGetTransactions());
+      } catch {
+        setTransactions([]);
+      }
+    })();
+  }, []);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-[#f5f7f8] text-slate-900 dark:bg-[#101922] dark:text-white">
+      <Sidebar role="admin" activePage="admin-revenue" onNavigate={onNavigate} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-50 flex items-center justify-between border-b border-gray-200 bg-white/90 px-6 py-3 backdrop-blur-md dark:border-dark-border dark:bg-dark-card/90">
+          <h2 className="text-lg font-bold">Tài chính và doanh thu</h2>
+          <button onClick={() => showInfoToast(`Trong ${periodDays} ngày qua có ${filteredTransactions.length} giao dịch.`)} className="text-slate-500 hover:text-primary">
+            <Bell size={20} />
+          </button>
+        </header>
+        <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Báo cáo doanh thu</h1>
+                <p className="mt-1 text-slate-500 dark:text-slate-400">Tổng quan tình hình tài chính và dòng tiền.</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setPeriodDays((current) => (current === 30 ? 90 : current === 90 ? 365 : 30))} className="flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium hover:border-primary dark:border-dark-border dark:bg-dark-card">
+                  <Calendar size={18} />
+                  {periodDays === 30 ? '30 ngày' : periodDays === 90 ? '90 ngày' : '12 tháng'}
+                </button>
+                <button onClick={handleExport} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:bg-primary-hover">
+                  <Download size={18} />
+                  Xuất báo cáo
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-500/20">
+                <p className="mb-1 font-medium text-blue-100">Tổng doanh thu</p>
+                <h3 className="mb-4 text-3xl font-bold">{summary?.totalRevenue ? Number(summary.totalRevenue).toLocaleString('vi-VN') : 0} đ</h3>
+                <div className="flex w-fit items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm">
+                  <TrendingUp size={16} />
+                  <span>+15% so với tháng trước</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-card">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="rounded-xl bg-green-100 p-3 text-green-600 dark:bg-green-900/30">
+                    <Wallet size={24} />
+                  </div>
+                  <span className="flex items-center rounded bg-green-50 px-2 py-0.5 text-sm font-bold text-green-500 dark:bg-green-900/10">
+                    <ArrowUpRight size={16} /> +5.2%
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Giao dịch thành công</p>
+                <h3 className="text-2xl font-bold">{summary?.successfulTransactions ?? 0}</h3>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-card">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="rounded-xl bg-red-100 p-3 text-red-600 dark:bg-red-900/30">
+                    <CreditCard size={24} />
+                  </div>
+                  <span className="flex items-center rounded bg-red-50 px-2 py-0.5 text-sm font-bold text-red-500 dark:bg-red-900/10">
+                    <ArrowDownRight size={16} /> -1.2%
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Hoàn tiền / Hủy</p>
+                <h3 className="text-2xl font-bold">{summary?.failedTransactions ?? 0}</h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-card">
+                <h3 className="mb-6 text-lg font-bold">Biểu đồ tăng trưởng</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={filteredPoints}>
+                      <defs>
+                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d7ff2" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#0d7ff2" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                      <Area type="monotone" dataKey="revenue" stroke="#0d7ff2" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-card">
+                <h3 className="mb-6 text-lg font-bold">Nguồn doanh thu</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={filteredPoints}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                      <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                      <Bar dataKey="revenue" fill="#0d7ff2" radius={[6, 6, 0, 0]} barSize={40} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-dark-border dark:bg-dark-card">
+              <div className="border-b border-gray-200 p-6 dark:border-dark-border">
+                <h3 className="text-lg font-bold">Giao dịch gần đây</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 dark:bg-dark-bg">
+                    <tr>
+                      <th className="p-4">Mã GD</th>
+                      <th className="p-4">Khách hàng</th>
+                      <th className="p-4">Dịch vụ</th>
+                      <th className="p-4">Ngày GD</th>
+                      <th className="p-4">Số tiền</th>
+                      <th className="p-4">Phương thức</th>
+                      <th className="p-4 text-right">Chi tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                    {filteredTransactions.map((tx: any) => (
+                      <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-dark-border/30">
+                        <td className="p-4 font-mono text-xs text-slate-500">{tx.id}</td>
+                        <td className="p-4 font-medium">{tx.userId?.slice(0, 6)}</td>
+                        <td className="p-4 text-slate-600 dark:text-slate-300">{tx.courseTitle}</td>
+                        <td className="p-4 text-slate-500">{new Date(tx.createdAt).toLocaleString()}</td>
+                        <td className="p-4 font-bold">{Number(tx.amount).toLocaleString('vi-VN')}đ</td>
+                        <td className="p-4 text-xs font-medium text-slate-600 dark:text-slate-400">{tx.method}</td>
+                        <td className="p-4 text-right">
+                          <button onClick={() => setSelectedTransaction(tx)} className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-white">
+                            Xem
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </header>
-
-        <main className="flex-1 flex justify-center py-8 px-4 sm:px-6 lg:px-8 overflow-y-auto">
-           <div className="w-full max-w-[1200px] flex flex-col gap-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Báo Cáo Doanh Thu</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Tổng quan tình hình tài chính và dòng tiền.</p>
-                 </div>
-                 <div className="flex gap-2">
-                    <button className="flex items-center gap-2 h-10 px-4 rounded-lg bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border font-medium text-sm hover:border-primary transition-colors">
-                       <Calendar size={18} />
-                       <span>Tháng này</span>
-                    </button>
-                    <button className="flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-white font-medium text-sm shadow hover:bg-primary-hover transition-colors">
-                       <Download size={18} />
-                       <span>Xuất báo cáo</span>
-                    </button>
-                 </div>
-              </div>
-
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-500/20">
-                     <p className="text-blue-100 font-medium mb-1">Tổng doanh thu</p>
-                     <h3 className="text-3xl font-bold mb-4">125.500.000 đ</h3>
-                     <div className="flex items-center gap-2 text-sm bg-white/20 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
-                        <TrendingUp size={16} />
-                        <span>+15% so với tháng trước</span>
-                     </div>
-                  </div>
-                  <div className="bg-white dark:bg-dark-card rounded-2xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
-                     <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-xl">
-                           <Wallet size={24} />
-                        </div>
-                        <span className="flex items-center text-green-500 text-sm font-bold bg-green-50 dark:bg-green-900/10 px-2 py-0.5 rounded"><ArrowUpRight size={16} /> +5.2%</span>
-                     </div>
-                     <p className="text-slate-500 dark:text-slate-400 text-sm">Giao dịch thành công</p>
-                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white">1,240</h3>
-                  </div>
-                  <div className="bg-white dark:bg-dark-card rounded-2xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
-                     <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-xl">
-                           <CreditCard size={24} />
-                        </div>
-                        <span className="flex items-center text-red-500 text-sm font-bold bg-red-50 dark:bg-red-900/10 px-2 py-0.5 rounded"><ArrowDownRight size={16} /> -1.2%</span>
-                     </div>
-                     <p className="text-slate-500 dark:text-slate-400 text-sm">Hoàn tiền / Hủy</p>
-                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white">12</h3>
-                  </div>
-              </div>
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 {/* Area Chart */}
-                 <div className="bg-white dark:bg-dark-card p-6 rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm">
-                    <h3 className="font-bold text-lg mb-6">Biểu đồ tăng trưởng</h3>
-                    <div className="h-[300px]">
-                       <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={REVENUE_DATA}>
-                             <defs>
-                                <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                   <stop offset="5%" stopColor="#0d7ff2" stopOpacity={0.3}/>
-                                   <stop offset="95%" stopColor="#0d7ff2" stopOpacity={0}/>
-                                </linearGradient>
-                             </defs>
-                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
-                             <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                             <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                             <Area type="monotone" dataKey="revenue" stroke="#0d7ff2" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                          </AreaChart>
-                       </ResponsiveContainer>
-                    </div>
-                 </div>
-
-                 {/* Bar Chart */}
-                 <div className="bg-white dark:bg-dark-card p-6 rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm">
-                    <h3 className="font-bold text-lg mb-6">Nguồn doanh thu</h3>
-                    <div className="h-[300px]">
-                       <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={[
-                             { name: 'Khóa lẻ', val: 65 },
-                             { name: 'Combo', val: 40 },
-                             { name: 'Pro', val: 85 },
-                             { name: 'Ent', val: 20 },
-                          ]}>
-                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
-                             <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                             <Bar dataKey="val" fill="#0d7ff2" radius={[6, 6, 0, 0]} barSize={40} />
-                          </BarChart>
-                       </ResponsiveContainer>
-                    </div>
-                 </div>
-              </div>
-
-              {/* Transactions Table */}
-              <div className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden">
-                 <div className="p-6 border-b border-gray-200 dark:border-dark-border">
-                    <h3 className="font-bold text-lg">Giao dịch gần đây</h3>
-                 </div>
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                       <thead className="bg-gray-50 dark:bg-dark-bg border-b border-gray-200 dark:border-dark-border">
-                          <tr>
-                             <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Mã GD</th>
-                             <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Khách hàng</th>
-                             <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Dịch vụ</th>
-                             <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Ngày GD</th>
-                             <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Số tiền</th>
-                             <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">Phương thức</th>
-                          </tr>
-                       </thead>
-                       <tbody className="divide-y divide-gray-100 dark:divide-dark-border text-sm">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                             <tr key={i} className="hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
-                                <td className="p-4 font-mono text-xs text-slate-500">#TRX-882{i}</td>
-                                <td className="p-4 font-medium">Nguyễn Văn {String.fromCharCode(65+i)}</td>
-                                <td className="p-4 text-slate-600 dark:text-slate-300">Khóa học ReactJS Pro</td>
-                                <td className="p-4 text-slate-500">24/10/2023, 10:30</td>
-                                <td className="p-4 font-bold text-slate-900 dark:text-white">{(500000 * i).toLocaleString('vi-VN')}đ</td>
-                                <td className="p-4 text-right">
-                                   <div className="flex items-center justify-end gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
-                                      <CreditCard size={14} /> Visa **** 4242
-                                   </div>
-                                </td>
-                             </tr>
-                          ))}
-                       </tbody>
-                    </table>
-                 </div>
-              </div>
-
-           </div>
         </main>
       </div>
+
+      {selectedTransaction && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 py-6">
+          <button className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setSelectedTransaction(null)} aria-label="Đóng chi tiết giao dịch" />
+          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:border-dark-border dark:bg-dark-card">
+            <div className="border-b border-gray-100 px-6 py-5 dark:border-dark-border">
+              <h3 className="text-2xl font-bold">Chi tiết giao dịch</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Kiểm tra thông tin thanh toán và trạng thái giao dịch.</p>
+            </div>
+            <div className="grid gap-6 px-6 py-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-dark-border dark:bg-dark-bg">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Mã giao dịch</p>
+                  <p className="mt-2 font-mono text-sm">{selectedTransaction.id}</p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Khách hàng</p>
+                      <p className="mt-2 font-semibold">{selectedTransaction.userId || 'Đang cập nhật'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Khóa học</p>
+                      <p className="mt-2 font-semibold">{selectedTransaction.courseTitle || 'Đang cập nhật'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Số tiền</p>
+                      <p className="mt-2 font-semibold text-primary">{Number(selectedTransaction.amount || 0).toLocaleString('vi-VN')}đ</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Phương thức</p>
+                      <p className="mt-2 font-semibold">{selectedTransaction.method || 'Đang cập nhật'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-dark-border dark:bg-dark-card">
+                  <h4 className="text-lg font-bold">Trạng thái xử lý</h4>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Ngày tạo</p>
+                      <p className="mt-2 font-medium">{new Date(selectedTransaction.createdAt).toLocaleString('vi-VN')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Trạng thái</p>
+                      <p className="mt-2 font-medium">{selectedTransaction.status || 'Đang cập nhật'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-dark-border dark:bg-dark-bg">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Ghi chú</p>
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-slate-500 dark:border-dark-border dark:bg-dark-card dark:text-slate-400">
+                  Nếu phát sinh chênh lệch, hãy kiểm tra lại trạng thái giao dịch trước khi hỗ trợ người dùng.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
