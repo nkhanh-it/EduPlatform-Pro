@@ -1,239 +1,366 @@
-import React from 'react';
-import { 
-  ArrowLeft, 
-  PlayCircle, 
-  Settings, 
-  Maximize, 
-  Volume2, 
-  Info, 
-  Folder, 
-  MessageSquare, 
-  Star,
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  PlayCircle,
+  Settings,
+  Maximize,
+  Volume2,
+  Info,
+  Folder,
+  MessageSquare,
   CheckCircle,
   Circle,
-  ChevronDown,
   ChevronRight,
   Search,
-  Award
+  Award,
 } from 'lucide-react';
+import {
+  getCourse,
+  getCourseLessons,
+  getMyEnrollments,
+  getSelectedCourseId,
+  getSelectedLessonId,
+  setSelectedLessonId,
+  updateEnrollmentProgress,
+} from '../api';
+import { Course, Enrollment, Lesson } from '../types';
 
 interface CoursePlayerProps {
   onNavigate: (page: string) => void;
 }
 
+const formatDuration = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
+  const [activeTab, setActiveTab] = useState<'desc' | 'docs' | 'discussion'>('desc');
+  const [course, setCourse] = useState<Course | null>(null);
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      const selectedCourseId = getSelectedCourseId();
+      if (!selectedCourseId) {
+        setError('Đã xảy ra lỗi, vui lòng thử lại.');
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+
+      try {
+        const [courseData, lessonData, enrollmentData] = await Promise.all([
+          getCourse(selectedCourseId),
+          getCourseLessons(selectedCourseId),
+          getMyEnrollments(),
+        ]);
+
+        const matchedEnrollment =
+          (enrollmentData as Enrollment[]).find((item) => item.course?.id === selectedCourseId) || null;
+
+        if (!matchedEnrollment) {
+          setError('Đã xảy ra lỗi, vui lòng thử lại.');
+          setLoading(false);
+          return;
+        }
+
+        const normalizedLessons = (lessonData as Lesson[]).slice().sort((a, b) => a.orderIndex - b.orderIndex);
+        const completedCount = Math.max(0, Math.min(matchedEnrollment.completedLessons || 0, normalizedLessons.length));
+        const initialCompletedIds = normalizedLessons.slice(0, completedCount).map((lesson) => lesson.id);
+        const storedLessonId = getSelectedLessonId();
+        const firstIncomplete = normalizedLessons[completedCount]?.id || normalizedLessons[0]?.id || null;
+        const nextActiveLessonId = normalizedLessons.some((lesson) => lesson.id === storedLessonId)
+          ? storedLessonId
+          : firstIncomplete;
+
+        setCourse(courseData as Course);
+        setLessons(normalizedLessons);
+        setEnrollment(matchedEnrollment);
+        setCompletedLessonIds(initialCompletedIds);
+        setActiveLessonId(nextActiveLessonId);
+
+        if (nextActiveLessonId) setSelectedLessonId(nextActiveLessonId);
+      } catch {
+        setError('Đã xảy ra lỗi, vui lòng thử lại.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const filteredLessons = useMemo(() => {
+    if (!search) return lessons;
+    return lessons.filter((lesson) => lesson.title.toLowerCase().includes(search.toLowerCase()));
+  }, [lessons, search]);
+
+  const activeLessonIndex = lessons.findIndex((lesson) => lesson.id === activeLessonId);
+  const activeLesson = activeLessonIndex >= 0 ? lessons[activeLessonIndex] : null;
+  const completedCount = completedLessonIds.length;
+  const totalLessons = lessons.length || enrollment?.totalLessons || 0;
+  const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+
+  const persistProgress = async (nextCompletedIds: string[]) => {
+    if (!enrollment) return;
+    const nextCompletedLessons = Math.min(nextCompletedIds.length, lessons.length);
+    const nextProgressPercent = lessons.length > 0 ? Math.round((nextCompletedLessons / lessons.length) * 100) : 0;
+
+    setSaving(true);
+    try {
+      const updated = await updateEnrollmentProgress(enrollment.id, {
+        progressPercent: nextProgressPercent,
+        completedLessons: nextCompletedLessons,
+        totalLessons: lessons.length,
+      });
+      setEnrollment(updated as Enrollment);
+      setCompletedLessonIds(nextCompletedIds);
+    } catch {
+      setError('Đã xảy ra lỗi, vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSelectLesson = (lessonId: string) => {
+    setActiveLessonId(lessonId);
+    setSelectedLessonId(lessonId);
+  };
+
+  const handleCompleteAndNext = async () => {
+    if (!activeLesson || activeLessonIndex < 0) return;
+
+    const nextCompletedIds = completedLessonIds.includes(activeLesson.id)
+      ? completedLessonIds
+      : [...completedLessonIds, activeLesson.id];
+
+    await persistProgress(nextCompletedIds);
+
+    const nextLesson = lessons[activeLessonIndex + 1];
+    if (nextLesson) handleSelectLesson(nextLesson.id);
+  };
+
+  const handlePreviousLesson = () => {
+    if (activeLessonIndex <= 0) return;
+    handleSelectLesson(lessons[activeLessonIndex - 1].id);
+  };
+
+  const handleNextLesson = () => {
+    if (activeLessonIndex < 0 || activeLessonIndex >= lessons.length - 1) return;
+    handleSelectLesson(lessons[activeLessonIndex + 1].id);
+  };
+
+  const isCompleted = (lessonId: string) => completedLessonIds.includes(lessonId);
+
+  if (loading) {
+    return <div className="min-h-screen bg-[#f5f7f8] px-6 py-10 text-sm text-slate-500">Đang tải trình phát khóa học...</div>;
+  }
+
+  if (error && !course) {
+    return (
+      <div className="min-h-screen bg-[#f5f7f8] px-6 py-10">
+        <p className="mb-4 text-sm text-red-500">{error}</p>
+        <button onClick={() => onNavigate('student-courses')} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">
+          Quay lại khóa học của tôi
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-screen bg-[#f5f7f8] dark:bg-[#101922] text-slate-900 dark:text-white overflow-hidden">
-      {/* Navbar */}
-      <header className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-6 py-3 shrink-0 z-20">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7f8] text-slate-900 dark:bg-[#101922] dark:text-white">
+      <header className="z-20 flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 py-3 dark:border-dark-border dark:bg-dark-bg">
         <div className="flex items-center gap-6">
-          <button onClick={() => onNavigate('student-courses')} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-primary transition-colors text-sm font-medium">
+          <button onClick={() => onNavigate('student-courses')} className="flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-primary dark:text-slate-400">
             <ArrowLeft size={20} />
             <span>Khóa học của tôi</span>
           </button>
           <div className="h-6 w-px bg-gray-200 dark:bg-dark-border"></div>
-          <h1 className="text-lg font-bold leading-tight hidden md:block">Mastering ReactJS: Từ Cơ Bản Đến Nâng Cao</h1>
+          <h1 className="hidden text-lg font-bold leading-tight md:block">{course?.title || 'Course Player'}</h1>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
             <div className="relative size-10">
               <svg className="size-full rotate-[-90deg]" viewBox="0 0 36 36">
                 <circle className="stroke-gray-200 dark:stroke-dark-border" cx="18" cy="18" fill="none" r="16" strokeWidth="3"></circle>
-                <circle className="stroke-primary" cx="18" cy="18" fill="none" r="16" strokeDasharray="100" strokeDashoffset="65" strokeLinecap="round" strokeWidth="3"></circle>
+                <circle className="stroke-primary" cx="18" cy="18" fill="none" r="16" strokeDasharray="100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" strokeWidth="3"></circle>
               </svg>
-              <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 text-[10px] font-bold">35%</div>
+              <div className="absolute left-1/2 top-1/2 text-[10px] font-bold -translate-x-1/2 -translate-y-1/2">{progressPercent}%</div>
             </div>
             <div className="hidden sm:block">
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Tiến độ của bạn</p>
-              <p className="text-sm font-bold">12/34 Bài học</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Tiến độ của bạn</p>
+              <p className="text-sm font-bold">{completedCount}/{totalLessons} bài học</p>
             </div>
           </div>
-          <div className="bg-center bg-no-repeat bg-cover rounded-full size-9 border-2 border-white dark:border-dark-border shadow-sm cursor-pointer" style={{ backgroundImage: 'url(https://picsum.photos/seed/user1/100/100)' }}></div>
+          <div className="size-9 cursor-pointer rounded-full border-2 border-white bg-cover bg-center bg-no-repeat shadow-sm dark:border-dark-border" style={{ backgroundImage: 'url(https://picsum.photos/seed/user1/100/100)' }}></div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Main Player Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 flex justify-center bg-gray-50 dark:bg-dark-bg">
-          <div className="w-full max-w-5xl flex flex-col gap-6">
-            {/* Video Player */}
-            <div className="relative w-full rounded-xl overflow-hidden shadow-2xl bg-black group aspect-video">
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: 'url(https://picsum.photos/seed/code/1920/1080)' }}>
-                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/30 transition-all cursor-pointer">
-                    <button className="flex items-center justify-center rounded-full size-20 bg-primary/90 text-white hover:bg-primary hover:scale-105 transition-all shadow-lg backdrop-blur-sm">
-                      <PlayCircle size={48} className="ml-1" />
-                    </button>
-                 </div>
-                 <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/80 to-transparent flex items-end px-4 pb-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-full flex flex-col gap-2">
-                       <div className="w-full h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer">
-                          <div className="w-[35%] h-full bg-primary relative"></div>
-                       </div>
-                       <div className="flex justify-between text-white text-xs font-medium">
-                          <div className="flex items-center gap-4">
-                             <PlayCircle size={20} className="cursor-pointer hover:text-primary" />
-                             <Volume2 size={20} className="cursor-pointer hover:text-primary" />
-                             <span>04:20 / 12:45</span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                             <Settings size={20} className="cursor-pointer hover:text-primary" />
-                             <Maximize size={20} className="cursor-pointer hover:text-primary" />
-                          </div>
-                       </div>
+        <main className="flex flex-1 justify-center overflow-y-auto bg-gray-50 p-4 dark:bg-dark-bg md:p-6 lg:p-8">
+          <div className="flex w-full max-w-5xl flex-col gap-6">
+            <div className="group relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
+              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${course?.thumbnail || 'https://picsum.photos/seed/code/1920/1080'})` }}>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <button onClick={handleCompleteAndNext} className="flex size-20 items-center justify-center rounded-full bg-primary/90 text-white shadow-lg backdrop-blur-sm transition-all hover:scale-105 hover:bg-primary">
+                    <PlayCircle size={48} className="ml-1" />
+                  </button>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 flex h-16 items-end bg-gradient-to-t from-black/80 to-transparent px-4 pb-4">
+                  <div className="flex w-full flex-col gap-2">
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-white/30">
+                      <div className="h-full bg-primary" style={{ width: `${progressPercent}%` }}></div>
                     </div>
-                 </div>
-              </div>
-            </div>
-
-            {/* Lesson Title & Navigation */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 dark:border-dark-border pb-6">
-              <div>
-                <h2 className="text-2xl font-bold mb-1">Chương 2, Bài 5: React Hooks - useEffect</h2>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">Cập nhật lần cuối: 24/05/2024</p>
-              </div>
-              <div className="flex gap-3 shrink-0">
-                <button className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-dark-border font-medium hover:bg-gray-100 dark:hover:bg-dark-card transition-colors">
-                  <ArrowLeft size={20} /> Bài trước
-                </button>
-                <button className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-blue-600 text-white font-medium shadow-lg shadow-blue-500/20 transition-colors">
-                  Bài tiếp theo <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div>
-              <div className="flex gap-8 border-b border-gray-200 dark:border-dark-border">
-                <button className="pb-3 border-b-2 border-primary text-primary font-bold text-sm flex items-center gap-2">
-                  <Info size={18} /> Mô tả
-                </button>
-                <button className="pb-3 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-primary font-medium text-sm transition-colors flex items-center gap-2">
-                  <Folder size={18} /> Tài liệu <span className="bg-gray-100 dark:bg-dark-card text-[10px] py-0.5 px-1.5 rounded-full ml-1">2</span>
-                </button>
-                <button className="pb-3 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-primary font-medium text-sm transition-colors flex items-center gap-2">
-                  <MessageSquare size={18} /> Thảo luận <span className="bg-gray-100 dark:bg-dark-card text-[10px] py-0.5 px-1.5 rounded-full ml-1">14</span>
-                </button>
-              </div>
-              <div className="py-6">
-                <div className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300">
-                  <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-3">Về bài học này</h3>
-                  <p className="leading-relaxed mb-4">
-                    Trong bài học này, chúng ta sẽ đi sâu vào <code className="bg-gray-100 dark:bg-dark-card px-1.5 py-0.5 rounded text-sm text-primary">useEffect</code> Hook. 
-                    Đây là một trong những hook quan trọng nhất để xử lý side effects trong functional components.
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2 mb-6 marker:text-primary">
-                    <li>Cách lifecycle methods hoạt động trong Class component và sự tương đồng với useEffect.</li>
-                    <li>Cách sử dụng dependency array để tối ưu hiệu năng.</li>
-                    <li>Cách cleanup effects để tránh memory leaks.</li>
-                  </ul>
-                  <div className="bg-blue-50 dark:bg-primary/10 border border-blue-100 dark:border-primary/20 rounded-lg p-4 flex gap-3 items-start">
-                    <Info size={20} className="text-primary mt-0.5" />
-                    <div>
-                      <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Mẹo nhỏ</h4>
-                      <p className="text-sm">Hãy chắc chắn bạn đã hoàn thành bài tập về <code className="text-primary font-mono text-xs">useState</code> trước khi bắt đầu bài này để có nền tảng tốt nhất.</p>
+                    <div className="flex justify-between text-xs font-medium text-white">
+                      <div className="flex items-center gap-4">
+                        <PlayCircle size={20} />
+                        <Volume2 size={20} />
+                        <span>{activeLesson ? formatDuration(activeLesson.durationSeconds) : '00:00'}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Settings size={20} />
+                        <Maximize size={20} />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 dark:border-dark-border md:flex-row md:items-center">
+              <div>
+                <h2 className="mb-1 text-2xl font-bold">
+                  {activeLesson ? `Bài ${activeLesson.orderIndex}: ${activeLesson.title}` : course?.title}
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Giảng viên: {course?.instructor || 'Đang cập nhật'} • Danh mục: {course?.category || 'Tổng hợp'}
+                </p>
+              </div>
+              <div className="shrink-0 flex gap-3">
+                <button onClick={handlePreviousLesson} disabled={activeLessonIndex <= 0} className="flex items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 font-medium transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-card">
+                  <ArrowLeft size={20} /> Bài trước
+                </button>
+                <button onClick={handleNextLesson} disabled={activeLessonIndex < 0 || activeLessonIndex >= lessons.length - 1} className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-medium text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600 disabled:opacity-50">
+                  Bài tiếp theo <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex gap-8 border-b border-gray-200 dark:border-dark-border">
+                <button onClick={() => setActiveTab('desc')} className={`flex items-center gap-2 border-b-2 pb-3 text-sm ${activeTab === 'desc' ? 'border-primary font-bold text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
+                  <Info size={18} /> Mô tả
+                </button>
+                <button onClick={() => setActiveTab('docs')} className={`flex items-center gap-2 border-b-2 pb-3 text-sm ${activeTab === 'docs' ? 'border-primary font-bold text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
+                  <Folder size={18} /> Tài liệu
+                </button>
+                <button onClick={() => setActiveTab('discussion')} className={`flex items-center gap-2 border-b-2 pb-3 text-sm ${activeTab === 'discussion' ? 'border-primary font-bold text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
+                  <MessageSquare size={18} /> Thảo luận
+                </button>
+              </div>
+              <div className="py-6">
+                {activeTab === 'desc' && (
+                  <div className="prose max-w-none text-slate-600 dark:prose-invert dark:text-slate-300">
+                    <h3 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">Về bài học này</h3>
+                    <p className="mb-4 leading-relaxed">
+                      Bạn đang học <strong>{activeLesson?.title || course?.title}</strong>. Hệ thống sẽ tự động lưu tiến độ sau khi bạn hoàn thành từng bài.
+                    </p>
+                    <ul className="mb-6 list-disc space-y-2 pl-5 marker:text-primary">
+                      <li>Tổng số bài học: {totalLessons}</li>
+                      <li>Đã hoàn thành: {completedCount}</li>
+                      <li>Trạng thái ghi danh: {enrollment?.status || 'N/A'}</li>
+                    </ul>
+                  </div>
+                )}
+                {activeTab === 'docs' && (
+                  <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-slate-600 dark:border-dark-border dark:bg-dark-card dark:text-slate-300">
+                    Tài liệu cho bài học này đang được cập nhật.
+                  </div>
+                )}
+                {activeTab === 'discussion' && (
+                  <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-slate-600 dark:border-dark-border dark:bg-dark-card dark:text-slate-300">
+                    Khu vực thảo luận đang được cập nhật.
+                  </div>
+                )}
+                {error && <p className="mt-4 text-sm text-red-500">{error}</p>}
+                {saving && <p className="mt-4 text-sm text-slate-500">Đang lưu tiến độ...</p>}
+              </div>
+            </div>
           </div>
         </main>
 
-        {/* Sidebar Lesson List */}
-        <aside className="w-80 lg:w-96 bg-white dark:bg-dark-sidebar border-l border-gray-200 dark:border-dark-border flex flex-col shrink-0">
-           <div className="p-4 border-b border-gray-200 dark:border-dark-border">
-              <h3 className="font-bold mb-3">Nội dung khóa học</h3>
-              <div className="relative">
-                 <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                 <input className="w-full bg-gray-100 dark:bg-dark-bg text-sm rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-slate-500" placeholder="Tìm kiếm bài học..." />
-              </div>
-           </div>
-           
-           <div className="flex-1 overflow-y-auto">
-              {/* Module 1 */}
-              <div className="border-b border-gray-100 dark:border-dark-border/50">
-                 <button className="w-full flex items-center justify-between p-4 bg-gray-50/50 dark:bg-dark-card hover:bg-gray-100 dark:hover:bg-dark-border transition-colors text-left group">
-                    <div>
-                       <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-0.5">Module 1</p>
-                       <h4 className="text-sm font-bold group-hover:text-primary">Giới thiệu & Cài đặt</h4>
-                    </div>
-                    <ChevronDown size={20} className="text-slate-400" />
-                 </button>
-                 <div className="bg-white dark:bg-dark-sidebar">
-                    {['Chào mừng bạn đến khóa học', 'Cài đặt môi trường VS Code'].map((lesson, idx) => (
-                       <div key={idx} className="flex items-start gap-3 p-3 pl-4 hover:bg-gray-50 dark:hover:bg-dark-card cursor-pointer group">
-                          <CheckCircle size={20} className="text-green-500 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                             <p className="text-sm font-medium group-hover:text-primary truncate">{idx + 1}. {lesson}</p>
-                             <div className="flex items-center gap-2 mt-1">
-                                <PlayCircle size={14} className="text-slate-400" />
-                                <span className="text-xs text-slate-500">05:00</span>
-                             </div>
-                          </div>
-                       </div>
-                    ))}
-                 </div>
-              </div>
+        <aside className="flex w-80 shrink-0 flex-col border-l border-gray-200 bg-white dark:border-dark-border dark:bg-dark-sidebar lg:w-96">
+          <div className="border-b border-gray-200 p-4 dark:border-dark-border">
+            <h3 className="mb-3 font-bold">Nội dung khóa học</h3>
+            <div className="relative">
+              <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg bg-gray-100 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-dark-bg" placeholder="Tìm kiếm bài học..." />
+            </div>
+          </div>
 
-              {/* Module 2 */}
-              <div className="border-b border-gray-100 dark:border-dark-border/50">
-                 <button className="w-full flex items-center justify-between p-4 bg-gray-50/50 dark:bg-dark-card hover:bg-gray-100 dark:hover:bg-dark-border transition-colors text-left group">
-                    <div>
-                       <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-0.5">Module 2</p>
-                       <h4 className="text-sm font-bold group-hover:text-primary">Core Concepts & Hooks</h4>
-                    </div>
-                    <ChevronDown size={20} className="text-slate-400" />
-                 </button>
-                 <div className="bg-white dark:bg-dark-sidebar">
-                    <div className="flex items-start gap-3 p-3 pl-4 hover:bg-gray-50 dark:hover:bg-dark-card cursor-pointer group">
-                       <CheckCircle size={20} className="text-green-500 mt-0.5" />
-                       <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium group-hover:text-primary">3. Tổng quan về Components</p>
-                          <div className="flex items-center gap-2 mt-1">
-                             <PlayCircle size={14} className="text-slate-400" />
-                             <span className="text-xs text-slate-500">10:15</span>
-                          </div>
-                       </div>
-                    </div>
-                    
-                    {/* Active Lesson */}
-                    <div className="flex items-start gap-3 p-3 pl-4 bg-blue-50 dark:bg-primary/10 border-r-4 border-primary cursor-pointer">
-                       <PlayCircle size={20} className="text-primary mt-0.5" />
-                       <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-primary">5. React Hooks - useEffect</p>
-                          <div className="flex items-center gap-2 mt-1">
-                             <PlayCircle size={14} className="text-primary/70" />
-                             <span className="text-xs text-primary/80">12:45</span>
-                             <span className="text-[10px] bg-primary text-white px-1.5 rounded ml-auto">Đang học</span>
-                          </div>
-                       </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3 pl-4 hover:bg-gray-50 dark:hover:bg-dark-card cursor-pointer group opacity-60">
-                       <Circle size={20} className="text-slate-400 mt-0.5" />
-                       <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium group-hover:text-primary">6. Custom Hooks</p>
-                          <div className="flex items-center gap-2 mt-1">
-                             <PlayCircle size={14} className="text-slate-400" />
-                             <span className="text-xs text-slate-500">08:20</span>
-                          </div>
-                       </div>
-                    </div>
-                 </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="border-b border-gray-100 dark:border-dark-border/50">
+              <div className="flex w-full items-center justify-between bg-gray-50/50 p-4 text-left dark:bg-dark-card">
+                <div>
+                  <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Course</p>
+                  <h4 className="text-sm font-bold">{course?.title}</h4>
+                </div>
+                <span className="text-xs font-medium text-slate-500">{filteredLessons.length}/{lessons.length}</span>
               </div>
-           </div>
+              <div className="bg-white dark:bg-dark-sidebar">
+                {filteredLessons.map((lesson) => {
+                  const lessonCompleted = isCompleted(lesson.id);
+                  const isActive = lesson.id === activeLessonId;
 
-           <div className="p-4 bg-gray-50 dark:bg-dark-bg border-t border-gray-200 dark:border-dark-border">
-              <div className="flex items-center gap-3">
-                 <div className="bg-yellow-500/10 p-2 rounded-lg text-yellow-500">
-                    <Award size={24} />
-                 </div>
-                 <div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Hoàn thành khóa học để nhận</p>
-                    <p className="text-sm font-bold">Chứng chỉ ReactJS Master</p>
-                 </div>
+                  return (
+                    <button key={lesson.id} onClick={() => handleSelectLesson(lesson.id)} className={`flex w-full items-start gap-3 p-3 pl-4 text-left transition-colors ${isActive ? 'border-r-4 border-primary bg-blue-50 dark:bg-primary/10' : 'hover:bg-gray-50 dark:hover:bg-dark-card'}`}>
+                      {lessonCompleted ? (
+                        <CheckCircle size={20} className="mt-0.5 shrink-0 text-green-500" />
+                      ) : isActive ? (
+                        <PlayCircle size={20} className="mt-0.5 shrink-0 text-primary" />
+                      ) : (
+                        <Circle size={20} className="mt-0.5 shrink-0 text-slate-400" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm ${isActive ? 'font-bold text-primary' : 'font-medium'}`}>
+                          {lesson.orderIndex}. {lesson.title}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <PlayCircle size={14} className={isActive ? 'text-primary/70' : 'text-slate-400'} />
+                          <span className="text-xs text-slate-500">{formatDuration(lesson.durationSeconds)}</span>
+                          {lesson.preview && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Preview</span>}
+                          {isActive && <span className="ml-auto rounded bg-primary px-1.5 text-[10px] text-white">Đang học</span>}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-           </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 bg-gray-50 p-4 dark:border-dark-border dark:bg-dark-bg">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-yellow-500/10 p-2 text-yellow-500">
+                <Award size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Hoàn thành khóa học để nhận chứng chỉ</p>
+                <p className="text-sm font-bold">{course?.title || 'Chưa chọn khóa học'}</p>
+              </div>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
