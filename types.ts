@@ -55,6 +55,7 @@ export interface Lesson {
   orderIndex: number;
   durationSeconds: number;
   preview: boolean;
+  gumletPlaybackUrl?: string | null;
 }
 
 export interface Stat {

@@ -48,7 +48,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         clearAuthSession();
       }
 
-      let message = 'Đã xảy ra lỗi, vui lòng thử lại.';
+      let message = '?? x?y ra l?i, vui l?ng th? l?i.';
       try {
         const errorBody = await response.json();
         if (errorBody?.message) {
@@ -56,6 +56,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         }
       } catch {
         // ignore
+      }
+      if (message === 'Unexpected error occurred') {
+        message = '?? x?y ra l?i, vui l?ng th? l?i.';
       }
       throw new Error(message);
     }
@@ -104,6 +107,7 @@ export type LessonDto = {
   orderIndex: number;
   durationSeconds: number;
   preview: boolean;
+  gumletPlaybackUrl?: string | null;
 };
 
 export type TransactionDto = {
@@ -169,6 +173,38 @@ export async function getCourse(id: string) {
 
 export async function getCourseLessons(courseId: string) {
   return request<LessonDto[]>(`/api/courses/${courseId}/lessons`);
+}
+
+export async function adminCreateLesson(courseId: string, payload: {
+  title: string;
+  orderIndex: number;
+  durationSeconds: number;
+  preview: boolean;
+  gumletPlaybackUrl?: string;
+}) {
+  return request<LessonDto>(`/api/courses/${courseId}/lessons`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminUpdateLesson(lessonId: string, payload: {
+  title?: string;
+  orderIndex?: number;
+  durationSeconds?: number;
+  preview?: boolean;
+  gumletPlaybackUrl?: string;
+}) {
+  return request<LessonDto>(`/api/lessons/${lessonId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminDeleteLesson(lessonId: string) {
+  return request<void>(`/api/lessons/${lessonId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function getCategories() {
