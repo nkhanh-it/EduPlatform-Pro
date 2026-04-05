@@ -135,6 +135,10 @@ const App: React.FC = () => {
   };
 
   const renderPage = () => {
+    const storedUser = getStoredUser();
+    const settingsRole = storedUser?.role === 'ADMIN' ? 'admin' : storedUser?.role === 'INSTRUCTOR' ? 'instructor' : 'student';
+    const backofficeRole = storedUser?.role === 'INSTRUCTOR' ? 'instructor' : 'admin';
+
     switch (currentPage) {
       case 'landing':
         return <LandingPage onNavigate={handleNavigate} />;
@@ -153,13 +157,13 @@ const App: React.FC = () => {
       case 'checkout':
         return <Checkout onNavigate={handleNavigate} />;
       case 'settings':
-        return <Settings onNavigate={handleNavigate} />;
+        return <Settings onNavigate={handleNavigate} role={settingsRole} />;
       case 'admin-dashboard':
         return <AdminDashboard onNavigate={handleNavigate} />;
       case 'admin-students':
         return <StudentList onNavigate={handleNavigate} />;
       case 'admin-courses':
-        return <AdminCourses onNavigate={handleNavigate} />;
+        return <AdminCourses onNavigate={handleNavigate} role={backofficeRole} />;
       case 'admin-registrations':
         return <AdminRegistrations onNavigate={handleNavigate} />;
       case 'admin-revenue':

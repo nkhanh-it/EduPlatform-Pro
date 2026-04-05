@@ -43,6 +43,7 @@ const Auth: React.FC<AuthProps> = ({ onNavigate }) => {
       showSuccessToast(isLogin ? 'Đăng nhập thành công' : 'Đăng ký thành công');
 
       if (response.user?.role === 'ADMIN') onNavigate('admin-dashboard');
+      else if (response.user?.role === 'INSTRUCTOR') onNavigate('admin-courses');
       else onNavigate('student-dashboard');
     } catch {
       setError('Đã xảy ra lỗi, vui lòng thử lại.');

@@ -1,5 +1,6 @@
 export interface Course {
   id: string;
+  courseCode?: string;
   title: string;
   instructor: string;
   thumbnail: string;
@@ -17,13 +18,14 @@ export interface Course {
 
 export interface User {
   id: string;
+  userCode?: string;
   name?: string;
   fullName?: string;
   displayName?: string;
   email: string;
   avatar?: string;
   avatarUrl?: string;
-  role: 'student' | 'admin' | 'STUDENT' | 'ADMIN';
+  role: 'student' | 'admin' | 'instructor' | 'STUDENT' | 'ADMIN' | 'INSTRUCTOR';
   joinDate: string;
   status: 'active' | 'inactive' | 'pending' | 'locked' | 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'LOCKED';
   coursesEnrolled?: number;
