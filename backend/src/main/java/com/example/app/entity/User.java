@@ -27,6 +27,9 @@ public class User {
     @Column(nullable = false)
     private String fullName;
 
+    @Column(length = 16)
+    private String userCode;
+
     private String displayName;
 
     @Column(nullable = false, unique = true)
@@ -64,6 +67,9 @@ public class User {
         if (joinDate == null) {
             joinDate = LocalDate.now();
         }
+        if (userCode == null || userCode.isBlank()) {
+            userCode = "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        }
         createdAt = now;
         updatedAt = now;
     }
@@ -87,6 +93,14 @@ public class User {
 
     public void setFullName(String fullName) {
         this.fullName = fullName;
+    }
+
+    public String getUserCode() {
+        return userCode;
+    }
+
+    public void setUserCode(String userCode) {
+        this.userCode = userCode;
     }
 
     public String getDisplayName() {

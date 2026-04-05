@@ -12,6 +12,7 @@ import com.example.app.repository.UserRepository;
 import com.example.app.security.SecurityUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.List;
@@ -33,11 +34,13 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional(readOnly = true)
     public User getByEmail(String email) {
         return userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
+    @Transactional(readOnly = true)
     public UserDto getCurrentUser() {
         String email = SecurityUtils.getCurrentUserEmail();
         if (email == null) {
@@ -46,6 +49,7 @@ public class UserService {
         return UserDto.fromEntity(getByEmail(email));
     }
 
+    @Transactional
     public UserDto updateProfile(UpdateProfileRequest request) {
         String email = SecurityUtils.getCurrentUserEmail();
         if (email == null) {
@@ -61,6 +65,7 @@ public class UserService {
         return UserDto.fromEntity(user);
     }
 
+    @Transactional
     public void changePassword(String currentPassword, String newPassword) {
         String email = SecurityUtils.getCurrentUserEmail();
         if (email == null) {
@@ -79,6 +84,7 @@ public class UserService {
         userRepository.save(user);
     }
 
+    @Transactional(readOnly = true)
     public List<UserDto> listStudents(UserStatus status) {
         Map<UUID, Integer> enrolledCourseCountByUserId = enrollmentRepository.findAll().stream()
             .collect(Collectors.groupingBy(
@@ -86,13 +92,16 @@ public class UserService {
                 Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
             ));
 
-        return userRepository.findAll().stream()
-            .filter(user -> user.getRole() == Role.STUDENT)
-            .filter(user -> status == null || user.getStatus() == status)
+        List<User> students = status == null
+            ? userRepository.findByRole(Role.STUDENT)
+            : userRepository.findByRoleAndStatus(Role.STUDENT, status);
+
+        return students.stream()
             .map(user -> UserDto.fromEntity(user, enrolledCourseCountByUserId.getOrDefault(user.getId(), 0)))
             .collect(Collectors.toList());
     }
 
+    @Transactional
     public UserDto updateStatus(UUID userId, UserStatus status) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -101,6 +110,7 @@ public class UserService {
         return UserDto.fromEntity(user);
     }
 
+    @Transactional
     public UserDto createStudent(String fullName, String email, String password, String phone) {
         String normalizedFullName = fullName == null ? null : fullName.trim();
         String normalizedEmail = email == null ? null : email.trim().toLowerCase();
@@ -119,10 +129,12 @@ public class UserService {
         return UserDto.fromEntity(user);
     }
 
-    public UserDto updateStudent(UUID userId, String fullName, String email, String phone) {
+    @Transactional
+    public UserDto updateStudent(UUID userId, String fullName, String email, String phone, String password) {
         String normalizedFullName = fullName == null ? null : fullName.trim();
         String normalizedEmail = email == null ? null : email.trim().toLowerCase();
         String normalizedPhone = phone == null || phone.isBlank() ? null : phone.trim();
+        String normalizedPassword = password == null || password.isBlank() ? null : password.trim();
 
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -136,6 +148,12 @@ public class UserService {
         user.setFullName(normalizedFullName);
         user.setEmail(normalizedEmail);
         user.setPhone(normalizedPhone);
+        if (normalizedPassword != null) {
+            if (normalizedPassword.length() < 6) {
+                throw new BadRequestException("Password must be at least 6 characters");
+            }
+            user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
+        }
         userRepository.save(user);
         return UserDto.fromEntity(user);
     }

@@ -36,6 +36,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/courses/**", "/api/categories/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/return").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/ipn").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .anyRequest().authenticated()
             )

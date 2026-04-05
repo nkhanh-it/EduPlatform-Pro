@@ -65,7 +65,13 @@ public class UserController {
     @PutMapping("/admin/students/{id}")
     public ResponseEntity<UserDto> updateStudent(@PathVariable UUID id,
                                                  @Valid @RequestBody AdminUpdateStudentRequest request) {
-        return ResponseEntity.ok(userService.updateStudent(id, request.getFullName(), request.getEmail(), request.getPhone()));
+        return ResponseEntity.ok(userService.updateStudent(
+            id,
+            request.getFullName(),
+            request.getEmail(),
+            request.getPhone(),
+            request.getPassword()
+        ));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

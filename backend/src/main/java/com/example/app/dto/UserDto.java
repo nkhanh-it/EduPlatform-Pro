@@ -10,6 +10,7 @@ import java.util.UUID;
 public class UserDto {
 
     private UUID id;
+    private String userCode;
     private String fullName;
     private String displayName;
     private String email;
@@ -28,6 +29,7 @@ public class UserDto {
     public static UserDto fromEntity(User user, Integer coursesEnrolled) {
         UserDto dto = new UserDto();
         dto.id = user.getId();
+        dto.userCode = user.getUserCode();
         dto.fullName = user.getFullName();
         dto.displayName = user.getDisplayName();
         dto.email = user.getEmail();
@@ -47,6 +49,10 @@ public class UserDto {
 
     public String getFullName() {
         return fullName;
+    }
+
+    public String getUserCode() {
+        return userCode;
     }
 
     public String getDisplayName() {
