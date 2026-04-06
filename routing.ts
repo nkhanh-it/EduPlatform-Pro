@@ -14,14 +14,14 @@ export type Page =
   | 'checkout'
   | 'settings';
 
-type UserRole = 'ADMIN' | 'STUDENT' | null | undefined;
+type UserRole = 'ADMIN' | 'STUDENT' | 'INSTRUCTOR' | null | undefined;
 
 type RouteConfig = {
   page: Page;
   path: string;
   requiresAuth?: boolean;
   publicOnly?: boolean;
-  allowedRoles?: Array<'ADMIN' | 'STUDENT'>;
+  allowedRoles?: Array<'ADMIN' | 'STUDENT' | 'INSTRUCTOR'>;
 };
 
 const ROUTES: RouteConfig[] = [
@@ -33,10 +33,10 @@ const ROUTES: RouteConfig[] = [
   { page: 'student-dashboard', path: '/dashboard', requiresAuth: true, allowedRoles: ['STUDENT'] },
   { page: 'student-courses', path: '/my-courses', requiresAuth: true, allowedRoles: ['STUDENT'] },
   { page: 'course-player', path: '/learn', requiresAuth: true, allowedRoles: ['STUDENT'] },
-  { page: 'settings', path: '/settings', requiresAuth: true, allowedRoles: ['ADMIN', 'STUDENT'] },
+  { page: 'settings', path: '/settings', requiresAuth: true, allowedRoles: ['ADMIN', 'STUDENT', 'INSTRUCTOR'] },
   { page: 'admin-dashboard', path: '/admin', requiresAuth: true, allowedRoles: ['ADMIN'] },
   { page: 'admin-students', path: '/admin/students', requiresAuth: true, allowedRoles: ['ADMIN'] },
-  { page: 'admin-courses', path: '/admin/courses', requiresAuth: true, allowedRoles: ['ADMIN'] },
+  { page: 'admin-courses', path: '/admin/courses', requiresAuth: true, allowedRoles: ['ADMIN', 'INSTRUCTOR'] },
   { page: 'admin-registrations', path: '/admin/registrations', requiresAuth: true, allowedRoles: ['ADMIN'] },
   { page: 'admin-revenue', path: '/admin/revenue', requiresAuth: true, allowedRoles: ['ADMIN'] },
 ];
@@ -88,7 +88,7 @@ export function canAccessPage(
     return false;
   }
 
-  if (route.allowedRoles && !route.allowedRoles.includes((auth.role ?? null) as 'ADMIN' | 'STUDENT')) {
+  if (route.allowedRoles && !route.allowedRoles.includes((auth.role ?? null) as 'ADMIN' | 'STUDENT' | 'INSTRUCTOR')) {
     return false;
   }
 
@@ -96,7 +96,13 @@ export function canAccessPage(
 }
 
 export function getDefaultPageForRole(role?: UserRole): Page {
-  return role === 'ADMIN' ? 'admin-dashboard' : 'student-dashboard';
+  if (role === 'ADMIN') {
+    return 'admin-dashboard';
+  }
+  if (role === 'INSTRUCTOR') {
+    return 'admin-courses';
+  }
+  return 'student-dashboard';
 }
 
 export function getFallbackPage(
