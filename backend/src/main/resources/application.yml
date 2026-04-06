@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://db.pbdolgaaoqsbkckgudoi.supabase.co:5432/postgres?sslmode=require"
+    driver-class-name: org.postgresql.Driver
+    username: "postgres"
+    password: '2_@LVAW/fqm-kGS'
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  jackson:
+    time-zone: Asia/Ho_Chi_Minh
+
+app:
+  jwt:
+    secret: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
+    expiration-minutes: 120
+    refresh-expiration-days: 30
+
+logging:
+  level:
+    org.springframework.security: INFO
