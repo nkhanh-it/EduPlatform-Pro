@@ -1,32 +1,20 @@
-<<<<<<< Updated upstream
-import React, { useEffect, useState } from 'react';
-import {
-  Search,
-  PlayCircle,
-  Award,
-  BookOpen,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Award, BookOpen, Clock3, PlayCircle, Search } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
-=======
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { Search, PlayCircle, Award, BookOpen, Clock3 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import ControlSelect from '../components/filters/ControlSelect';
->>>>>>> Stashed changes
-import { Course, Enrollment, User } from '../types';
 import { getMe, getMyEnrollments, setSelectedCourseId } from '../api';
+import { Course, Enrollment, User } from '../types';
 
 interface StudentCoursesProps {
   onNavigate: (page: string) => void;
 }
 
+type SortMode = 'LATEST' | 'OLDEST' | 'TITLE_ASC' | 'TITLE_DESC' | 'PROGRESS_DESC';
+type StudentCourseItem = Course & { enrolledAt?: string };
+
 const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'in-progress' | 'completed'>('all');
   const [search, setSearch] = useState('');
-<<<<<<< Updated upstream
-=======
-  const [sortMode, setSortMode] = useState<'LATEST' | 'OLDEST' | 'TITLE_ASC' | 'TITLE_DESC' | 'PROGRESS_DESC'>('LATEST');
->>>>>>> Stashed changes
+  const [sortMode, setSortMode] = useState<SortMode>('LATEST');
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,17 +38,6 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
     load();
   }, []);
 
-<<<<<<< Updated upstream
-  const courses = enrollments.map((enrollment) => {
-    const course = enrollment.course as Course;
-    return {
-      ...course,
-      progress: enrollment.progressPercent,
-      totalLessons: enrollment.totalLessons,
-      completedLessons: enrollment.completedLessons,
-    } as Course;
-  });
-=======
   const courses = useMemo(
     () =>
       enrollments.map((enrollment) => {
@@ -71,7 +48,7 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
           totalLessons: enrollment.totalLessons,
           completedLessons: enrollment.completedLessons,
           enrolledAt: enrollment.enrolledAt,
-        } as Course;
+        } as StudentCourseItem;
       }),
     [enrollments],
   );
@@ -83,19 +60,25 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
     return { total, inProgress, completed };
   }, [courses]);
 
-  const filteredCourses = courses
-    .filter((course) => {
-      if (activeTab === 'in-progress') return (course.progress || 0) > 0 && (course.progress || 0) < 100;
-      if (activeTab === 'completed') return (course.progress || 0) === 100;
-      return true;
-    })
-    .filter((course) => {
-      if (!search) return true;
-      return course.title.toLowerCase().includes(search.toLowerCase()) || course.instructor.toLowerCase().includes(search.toLowerCase());
-    });
+  const filteredCourses = useMemo(
+    () =>
+      courses
+        .filter((course) => {
+          if (activeTab === 'in-progress') return (course.progress || 0) > 0 && (course.progress || 0) < 100;
+          if (activeTab === 'completed') return (course.progress || 0) === 100;
+          return true;
+        })
+        .filter((course) => {
+          if (!search) return true;
+          const keyword = search.toLowerCase();
+          return course.title.toLowerCase().includes(keyword) || course.instructor.toLowerCase().includes(keyword);
+        }),
+    [activeTab, courses, search],
+  );
 
   const sortedCourses = useMemo(() => {
-    const list = [...filteredCourses] as Array<Course & { enrolledAt?: string }>;
+    const list = [...filteredCourses];
+
     switch (sortMode) {
       case 'OLDEST':
         list.sort((a, b) => new Date(a.enrolledAt || 0).getTime() - new Date(b.enrolledAt || 0).getTime());
@@ -113,21 +96,17 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
         list.sort((a, b) => new Date(b.enrolledAt || 0).getTime() - new Date(a.enrolledAt || 0).getTime());
         break;
     }
+
     return list;
   }, [filteredCourses, sortMode]);
->>>>>>> Stashed changes
 
-  const filteredCourses = courses
-    .filter((course) => {
-      if (activeTab === 'in-progress') return (course.progress || 0) > 0 && (course.progress || 0) < 100;
-      if (activeTab === 'completed') return (course.progress || 0) === 100;
-      return true;
-    })
-    .filter((course) => {
-      if (!search) return true;
-      return course.title.toLowerCase().includes(search.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(search.toLowerCase());
-    });
+  const sortModeLabel = {
+    LATEST: 'Mới ghi danh nhất',
+    OLDEST: 'Ghi danh lâu nhất',
+    TITLE_ASC: 'Tên A-Z',
+    TITLE_DESC: 'Tên Z-A',
+    PROGRESS_DESC: 'Tiến độ cao nhất',
+  }[sortMode];
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f5f7f8] text-slate-900 dark:bg-[#101922] dark:text-white">
@@ -150,8 +129,6 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
 
         <main className="flex-1 overflow-y-auto p-6 md:p-8">
           <div className="mx-auto max-w-7xl space-y-6">
-<<<<<<< Updated upstream
-=======
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-border dark:bg-dark-card">
                 <p className="text-sm text-slate-500 dark:text-slate-400">Tổng khóa học</p>
@@ -167,7 +144,6 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
               </div>
             </div>
 
->>>>>>> Stashed changes
             <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
               <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-dark-border dark:bg-dark-card">
                 {['all', 'in-progress', 'completed'].map((tab) => (
@@ -175,13 +151,7 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
                     key={tab}
                     onClick={() => setActiveTab(tab as 'all' | 'in-progress' | 'completed')}
                     className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition-all ${
-<<<<<<< Updated upstream
-                      activeTab === tab
-                        ? 'bg-primary text-white shadow-md'
-                        : 'text-slate-600 hover:text-primary dark:text-slate-400'
-=======
                       activeTab === tab ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:text-primary dark:text-slate-400'
->>>>>>> Stashed changes
                     }`}
                   >
                     {tab === 'all' ? 'Tất cả' : tab === 'in-progress' ? 'Đang học' : 'Hoàn thành'}
@@ -189,15 +159,6 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
                 ))}
               </div>
 
-<<<<<<< Updated upstream
-              <div className="relative w-full md:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input
-                  className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:border-dark-border dark:bg-dark-card"
-                  placeholder="Tìm khóa học của bạn..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-=======
               <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
                 <div className="relative w-full md:w-80">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -208,40 +169,23 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-                <ControlSelect
+                <select
                   value={sortMode}
-                  onChange={(value) => setSortMode(value as typeof sortMode)}
-                  options={[
-                    { value: 'LATEST', label: 'Mới ghi danh nhất' },
-                    { value: 'OLDEST', label: 'Ghi danh lâu nhất' },
-                    { value: 'TITLE_ASC', label: 'Tên A-Z' },
-                    { value: 'TITLE_DESC', label: 'Tên Z-A' },
-                    { value: 'PROGRESS_DESC', label: 'Tiến độ cao nhất' },
-                  ]}
->>>>>>> Stashed changes
-                />
+                  onChange={(event) => setSortMode(event.target.value as SortMode)}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:border-dark-border dark:bg-dark-card"
+                >
+                  <option value="LATEST">Mới ghi danh nhất</option>
+                  <option value="OLDEST">Ghi danh lâu nhất</option>
+                  <option value="TITLE_ASC">Tên A-Z</option>
+                  <option value="TITLE_DESC">Tên Z-A</option>
+                  <option value="PROGRESS_DESC">Tiến độ cao nhất</option>
+                </select>
               </div>
             </div>
 
-<<<<<<< Updated upstream
-            {error && <p className="text-sm text-red-500">{error}</p>}
-
-            {loading ? (
-              <p className="text-sm text-slate-500">Đang tải...</p>
-            ) : filteredCourses.length > 0 ? (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {filteredCourses.map((course) => (
-                  <div key={course.id} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:shadow-xl dark:border-dark-border dark:bg-dark-card">
-=======
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
               <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-gray-200 dark:bg-dark-card dark:ring-dark-border">
-                Sắp xếp: {{
-                  LATEST: 'Mới ghi danh nhất',
-                  OLDEST: 'Ghi danh lâu nhất',
-                  TITLE_ASC: 'Tên A-Z',
-                  TITLE_DESC: 'Tên Z-A',
-                  PROGRESS_DESC: 'Tiến độ cao nhất',
-                }[sortMode]}
+                Sắp xếp: {sortModeLabel}
               </span>
               <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-gray-200 dark:bg-dark-card dark:ring-dark-border">
                 Kết quả: {sortedCourses.length} khóa học
@@ -252,33 +196,24 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
 
             {loading ? (
               <p className="text-sm text-slate-500">Đang xử lý...</p>
-            ) : filteredCourses.length > 0 ? (
+            ) : sortedCourses.length > 0 ? (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {sortedCourses.map((course) => (
                   <div key={course.id} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-dark-border dark:bg-dark-card">
->>>>>>> Stashed changes
                     <div className="relative h-48 overflow-hidden bg-gray-200">
                       <div className="h-full w-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${course.thumbnail})` }} />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
-<<<<<<< Updated upstream
-                          onClick={() => { setSelectedCourseId(course.id); onNavigate('course-player'); }}
-=======
                           onClick={() => {
                             setSelectedCourseId(course.id);
                             onNavigate('course-player');
                           }}
->>>>>>> Stashed changes
                           className="translate-y-4 rounded-full bg-primary p-3 text-white shadow-lg transition-all hover:bg-primary-hover group-hover:translate-y-0"
                         >
                           <PlayCircle size={32} />
                         </button>
                       </div>
-<<<<<<< Updated upstream
-                      {course.progress === 100 && (
-=======
                       {(course.progress || 0) === 100 && (
->>>>>>> Stashed changes
                         <div className="absolute right-3 top-3 flex items-center gap-1 rounded bg-green-500 px-2 py-1 text-xs font-bold text-white shadow-lg">
                           <Award size={14} /> Hoàn thành
                         </div>
@@ -291,37 +226,18 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
                         <p className="text-sm text-slate-500 dark:text-slate-400">{course.instructor}</p>
                       </div>
 
-<<<<<<< Updated upstream
-                      <div className="mt-auto border-t border-gray-100 pt-4 dark:border-dark-border">
-=======
                       <div className="mt-auto rounded-2xl bg-gray-50 p-4 dark:bg-dark-bg">
->>>>>>> Stashed changes
                         <div className="mb-2 flex items-end justify-between">
                           <span className="text-xs font-medium text-slate-500">Đã học {course.completedLessons}/{course.totalLessons} bài</span>
-                          <span className="text-sm font-bold text-primary">{course.progress}%</span>
+                          <span className="text-sm font-bold text-primary">{course.progress || 0}%</span>
                         </div>
-<<<<<<< Updated upstream
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-dark-border">
-                          <div className={`h-full rounded-full transition-all duration-500 ${course.progress === 100 ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${course.progress}%` }} />
-=======
                         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-border">
-                          <div className={`h-full rounded-full transition-all duration-500 ${(course.progress || 0) === 100 ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${course.progress}%` }} />
->>>>>>> Stashed changes
+                          <div className={`h-full rounded-full transition-all duration-500 ${(course.progress || 0) === 100 ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${course.progress || 0}%` }} />
                         </div>
                       </div>
 
                       <div className="mt-5 flex gap-3">
                         <button
-<<<<<<< Updated upstream
-                          onClick={() => { setSelectedCourseId(course.id); onNavigate('course-player'); }}
-                          className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-colors ${
-                            course.progress === 100
-                              ? 'border border-gray-200 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border'
-                              : 'bg-primary text-white shadow-lg shadow-primary/25 hover:bg-primary-hover'
-                          }`}
-                        >
-                          {course.progress === 100 ? 'Xem lại' : course.progress === 0 ? 'Bắt đầu học' : 'Tiếp tục học'}
-=======
                           onClick={() => {
                             setSelectedCourseId(course.id);
                             onNavigate('course-player');
@@ -329,7 +245,6 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
                           className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-colors ${(course.progress || 0) === 100 ? 'border border-gray-200 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border' : 'bg-primary text-white shadow-lg shadow-primary/25 hover:bg-primary-hover'}`}
                         >
                           {(course.progress || 0) === 100 ? 'Xem lại' : (course.progress || 0) === 0 ? 'Bắt đầu học' : 'Tiếp tục học'}
->>>>>>> Stashed changes
                         </button>
                       </div>
                     </div>
@@ -342,11 +257,7 @@ const StudentCourses: React.FC<StudentCoursesProps> = ({ onNavigate }) => {
                   <BookOpen size={48} className="text-slate-300" />
                 </div>
                 <h3 className="mb-2 text-xl font-bold">Chưa có khóa học nào</h3>
-<<<<<<< Updated upstream
-                <p className="mb-6 max-w-md text-slate-500">Khám phá thư viện để bắt đầu.</p>
-=======
                 <p className="mb-6 max-w-md text-slate-500">Bạn có thể vào thư viện để chọn khóa học phù hợp và bắt đầu học ngay.</p>
->>>>>>> Stashed changes
                 <button onClick={() => onNavigate('courses')} className="rounded-xl bg-primary px-6 py-3 font-bold text-white hover:bg-primary-hover">Khám phá ngay</button>
               </div>
             )}

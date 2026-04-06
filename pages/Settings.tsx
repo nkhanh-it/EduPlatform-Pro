@@ -1,15 +1,8 @@
-<<<<<<< Updated upstream
-import React, { useEffect, useState } from 'react';
-import { User, Lock, Bell, CreditCard, LogOut, Camera, Save, ShieldCheck } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import { changeMyPassword, clearAuthSession, getMe, setStoredUser, updateMe } from '../api';
-=======
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { User, Lock, CreditCard, LogOut, Camera, Save, BookOpen, Clock3, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BookOpen, Camera, CheckCircle2, Clock3, CreditCard, Lock, LogOut, Save, User } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { changeMyPassword, clearAuthSession, getMe, getMyEnrollments, setStoredUser, updateMe } from '../api';
 import { Enrollment } from '../types';
->>>>>>> Stashed changes
 import { showPrompt } from '../components/dialogs/DialogProvider';
 import { showErrorToast, showInfoToast, showSuccessToast, showWarningToast } from '../components/feedback/ToastProvider';
 
@@ -18,10 +11,6 @@ interface SettingsProps {
   role: 'student' | 'admin' | 'instructor';
 }
 
-<<<<<<< Updated upstream
-const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
-  const [activeTab, setActiveTab] = useState('profile');
-=======
 type SettingsTab = 'profile' | 'security' | 'billing';
 
 type ProfileSnapshot = {
@@ -43,20 +32,11 @@ const formatDate = (value?: string) => {
 
 const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
->>>>>>> Stashed changes
   const [fullName, setFullName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [phone, setPhone] = useState('');
-<<<<<<< Updated upstream
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [original, setOriginal] = useState<any>(null);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-=======
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -66,33 +46,19 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
->>>>>>> Stashed changes
 
   useEffect(() => {
     const load = async () => {
       try {
-<<<<<<< Updated upstream
-        const me = await getMe();
-=======
         const [me, myEnrollments] = await Promise.all([
           getMe(),
           role === 'student' ? getMyEnrollments() : Promise.resolve([]),
         ]);
->>>>>>> Stashed changes
         setFullName(me.fullName || '');
         setDisplayName(me.displayName || '');
         setBio(me.bio || '');
         setAvatarUrl(me.avatarUrl || '');
         setPhone(me.phone || '');
-<<<<<<< Updated upstream
-        setOriginal(me);
-      } catch {
-        // ignore
-      }
-    };
-    load();
-  }, []);
-=======
         setEmail(me.email || '');
         setOriginal(me);
         setEnrollments(myEnrollments as Enrollment[]);
@@ -102,6 +68,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
         setHistoryLoading(false);
       }
     };
+
     load();
   }, [role]);
 
@@ -112,7 +79,6 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
     const totalSpent = enrollments.reduce((sum, item) => sum + Number(item.course?.price || 0), 0);
     return { totalCourses, completedCourses, inProgressCourses, totalSpent };
   }, [enrollments]);
->>>>>>> Stashed changes
 
   const handleSave = async () => {
     if (fullName.trim().length < 2) {
@@ -123,9 +89,6 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
     setSaving(true);
     setMessage('');
     try {
-<<<<<<< Updated upstream
-      const updated = await updateMe({ fullName, displayName, avatarUrl, phone, bio });
-=======
       const updated = await updateMe({
         fullName: fullName.trim(),
         displayName: displayName.trim() || undefined,
@@ -133,7 +96,6 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
         phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
       });
->>>>>>> Stashed changes
       setStoredUser(updated);
       setOriginal(updated);
       setMessage('Lưu thành công');
@@ -154,26 +116,16 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
     setBio(original.bio || '');
     setAvatarUrl(original.avatarUrl || '');
     setPhone(original.phone || '');
-<<<<<<< Updated upstream
+    setEmail(original.email || '');
     setMessage('Đã khôi phục dữ liệu ban đầu.');
     showInfoToast('Đã khôi phục dữ liệu ban đầu.');
-=======
-    setEmail(original.email || '');
-    setMessage('Cập nhật thành công');
-    showInfoToast('Cập nhật thành công');
->>>>>>> Stashed changes
   };
 
   const handleChangeAvatar = () => {
     showPrompt({
       title: 'Cập nhật ảnh đại diện',
-<<<<<<< Updated upstream
-      message: 'Nhập URL mới cho ảnh đại diện.',
-      inputLabel: 'Avatar URL',
-=======
       message: 'Nhập đường dẫn ảnh mới cho tài khoản của bạn.',
       inputLabel: 'Link ảnh',
->>>>>>> Stashed changes
       inputType: 'url',
       defaultValue: avatarUrl || '',
     }).then((url) => {
@@ -187,11 +139,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
       showWarningToast();
       return;
     }
-<<<<<<< Updated upstream
-    if (newPassword !== confirmPassword) {
-=======
     if (newPassword.length < 6 || newPassword !== confirmPassword) {
->>>>>>> Stashed changes
       setMessage('Đã xảy ra lỗi, vui lòng thử lại.');
       showWarningToast();
       return;
@@ -216,25 +164,14 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
   };
 
   const tabs = [
-<<<<<<< Updated upstream
-    { id: 'profile', label: 'Thông tin cá nhân', icon: User },
-    { id: 'security', label: 'Mật khẩu và bảo mật', icon: Lock },
-    { id: 'notifications', label: 'Thông báo', icon: Bell },
-    { id: 'billing', label: 'Thanh toán', icon: CreditCard },
-=======
     { id: 'profile' as const, label: 'Thông tin cá nhân', icon: User },
     { id: 'security' as const, label: 'Mật khẩu', icon: Lock },
     ...(role === 'student' ? [{ id: 'billing' as const, label: 'Lịch sử mua', icon: CreditCard }] : []),
->>>>>>> Stashed changes
   ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f5f7f8] text-slate-900 dark:bg-[#101922] dark:text-white">
-<<<<<<< Updated upstream
-      <Sidebar role="student" activePage="settings" onNavigate={onNavigate} />
-=======
       <Sidebar role={role} activePage="settings" onNavigate={onNavigate} />
->>>>>>> Stashed changes
 
       <div className="relative flex h-full flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white/80 px-6 backdrop-blur-md dark:border-dark-border dark:bg-dark-bg/90 md:px-10">
@@ -242,11 +179,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 md:p-10">
-<<<<<<< Updated upstream
-          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-4">
-=======
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 lg:grid-cols-4">
->>>>>>> Stashed changes
             <div className="space-y-1 lg:col-span-1">
               {tabs.map((tab) => (
                 <button
@@ -274,133 +207,6 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
               </button>
             </div>
 
-<<<<<<< Updated upstream
-            <div className="lg:col-span-3">
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-dark-border dark:bg-dark-card">
-                {activeTab === 'profile' && (
-                  <div className="space-y-8 p-6 md:p-8">
-                    <div>
-                      <h2 className="text-lg font-bold">Hồ sơ công khai</h2>
-                      <p className="text-sm text-slate-500">Thông tin này sẽ hiển thị trong tài khoản của bạn.</p>
-                    </div>
-
-                    <div className="flex items-center gap-6">
-                      <div className="relative">
-                        <div className="size-24 rounded-full border-4 border-white bg-cover bg-center shadow-md dark:border-dark-card" style={{ backgroundImage: `url(${avatarUrl || 'https://picsum.photos/seed/user1/200/200'})` }}></div>
-                        <button onClick={handleChangeAvatar} className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-primary p-2 text-white shadow-lg transition-colors hover:bg-primary-hover dark:border-dark-card">
-                          <Camera size={16} />
-                        </button>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold">{fullName || 'Học viên'}</h3>
-                        <p className="mb-2 text-sm text-slate-500">Học viên</p>
-                        <button onClick={handleChangeAvatar} className="rounded-lg border border-primary/20 px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-primary/5">
-                          Thay đổi ảnh đại diện
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Họ và tên</label>
-                        <input type="text" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Tên hiển thị</label>
-                        <input type="text" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Số điện thoại</label>
-                        <input type="text" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Giới thiệu bản thân</label>
-                        <textarea rows={4} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" value={bio} onChange={(e) => setBio(e.target.value)}></textarea>
-                      </div>
-                    </div>
-
-                    {message && <p className="text-sm text-slate-500">{message}</p>}
-
-                    <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-dark-border">
-                      <button onClick={handleCancel} className="rounded-xl px-6 py-2.5 text-sm font-bold text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-dark-border">Hủy bỏ</button>
-                      <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-60">
-                        <Save size={18} /> Lưu thay đổi
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'security' && (
-                  <div className="space-y-8 p-6 md:p-8">
-                    <div>
-                      <h2 className="text-lg font-bold">Mật khẩu và bảo mật</h2>
-                      <p className="text-sm text-slate-500">Quản lý mật khẩu và xác thực 2 bước.</p>
-                    </div>
-
-                    <div className="max-w-md space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Mật khẩu hiện tại</label>
-                        <input value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} type="password" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Mật khẩu mới</label>
-                        <input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Xác nhận mật khẩu mới</label>
-                        <input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type="password" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary dark:border-dark-border dark:bg-dark-bg" />
-                      </div>
-                    </div>
-
-                    <div className="border-t border-gray-100 pt-4 dark:border-dark-border">
-                      <h3 className="mb-4 font-bold">Xác thực 2 bước (2FA)</h3>
-                      <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-border dark:bg-dark-bg">
-                        <div className="flex items-center gap-4">
-                          <div className="rounded-lg bg-green-100 p-2 text-green-600">
-                            <ShieldCheck size={24} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold">Tin nhắn SMS</p>
-                            <p className="text-xs text-slate-500">Mã xác thực sẽ được gửi về số điện thoại của bạn.</p>
-                          </div>
-                        </div>
-                        <div className="relative inline-block h-6 w-12 rounded-full bg-green-500">
-                          <div className="absolute left-6 top-1 h-4 w-4 rounded-full bg-white shadow-sm"></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {message && <p className="text-sm text-slate-500">{message}</p>}
-
-                    <div className="flex justify-end pt-2">
-                      <button onClick={handleChangePassword} disabled={saving} className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-60">
-                        <Save size={18} /> Cập nhật mật khẩu
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'notifications' && (
-                  <div className="space-y-4 p-6 md:p-8">
-                    <h2 className="text-lg font-bold">Thông báo</h2>
-                    <p className="text-sm text-slate-500">Bạn sẽ nhận email khi giao dịch thành công, ghi danh được duyệt hoặc khóa học được cập nhật.</p>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-dark-border dark:bg-dark-bg">
-                      Hệ thống đang áp dụng các thông báo mặc định cho tài khoản của bạn.
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'billing' && (
-                  <div className="space-y-4 p-6 md:p-8">
-                    <h2 className="text-lg font-bold">Thanh toán</h2>
-                    <p className="text-sm text-slate-500">Bạn có thể chuyển sang trang thanh toán khi cần mua khóa học.</p>
-                    <button onClick={() => onNavigate('checkout')} className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white">
-                      Đi đến trang checkout
-                    </button>
-                  </div>
-                )}
-              </div>
-=======
             <div className="space-y-6 lg:col-span-3">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-border dark:bg-dark-card">
@@ -593,7 +399,6 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate, role }) => {
                   </div>
                 )}
               </div>
->>>>>>> Stashed changes
             </div>
           </div>
         </main>

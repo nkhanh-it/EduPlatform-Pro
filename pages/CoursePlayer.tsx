@@ -1,25 +1,15 @@
-<<<<<<< Updated upstream
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
-  PlayCircle,
-  Settings,
-  Maximize,
-  Volume2,
-=======
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ArrowLeft,
-  PlayCircle,
->>>>>>> Stashed changes
-  Info,
-  Folder,
-  MessageSquare,
-  CheckCircle,
-  Circle,
-  ChevronRight,
-  Search,
   Award,
+  CheckCircle,
+  ChevronRight,
+  Circle,
+  Folder,
+  Info,
+  MessageSquare,
+  PlayCircle,
+  Search,
 } from 'lucide-react';
 import {
   getCourse,
@@ -42,15 +32,6 @@ const formatDuration = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
-<<<<<<< Updated upstream
-=======
-const getGumletEmbedUrl = (lesson: Lesson | null) => {
-  if (!lesson) return null;
-  const raw = lesson.gumletPlaybackUrl?.trim();
-  return raw || null;
-};
-
->>>>>>> Stashed changes
 const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'desc' | 'docs' | 'discussion'>('desc');
   const [course, setCourse] = useState<Course | null>(null);
@@ -86,7 +67,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
           (enrollmentData as Enrollment[]).find((item) => item.course?.id === selectedCourseId) || null;
 
         if (!matchedEnrollment) {
-          setError('Đã xảy ra lỗi, vui lòng thử lại.');
+          setError('Bạn chưa được ghi danh khóa học này.');
           setLoading(false);
           return;
         }
@@ -96,13 +77,9 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
         const initialCompletedIds = normalizedLessons.slice(0, completedCount).map((lesson) => lesson.id);
         const storedLessonId = getSelectedLessonId();
         const firstIncomplete = normalizedLessons[completedCount]?.id || normalizedLessons[0]?.id || null;
-<<<<<<< Updated upstream
         const nextActiveLessonId = normalizedLessons.some((lesson) => lesson.id === storedLessonId)
           ? storedLessonId
           : firstIncomplete;
-=======
-        const nextActiveLessonId = normalizedLessons.some((lesson) => lesson.id === storedLessonId) ? storedLessonId : firstIncomplete;
->>>>>>> Stashed changes
 
         setCourse(courseData as Course);
         setLessons(normalizedLessons);
@@ -128,10 +105,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
 
   const activeLessonIndex = lessons.findIndex((lesson) => lesson.id === activeLessonId);
   const activeLesson = activeLessonIndex >= 0 ? lessons[activeLessonIndex] : null;
-<<<<<<< Updated upstream
-=======
-  const activeLessonEmbedUrl = getGumletEmbedUrl(activeLesson);
->>>>>>> Stashed changes
   const completedCount = completedLessonIds.length;
   const totalLessons = lessons.length || enrollment?.totalLessons || 0;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
@@ -172,7 +145,9 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
     await persistProgress(nextCompletedIds);
 
     const nextLesson = lessons[activeLessonIndex + 1];
-    if (nextLesson) handleSelectLesson(nextLesson.id);
+    if (nextLesson) {
+      handleSelectLesson(nextLesson.id);
+    }
   };
 
   const handlePreviousLesson = () => {
@@ -186,10 +161,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
   };
 
   const isCompleted = (lessonId: string) => completedLessonIds.includes(lessonId);
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
   if (loading) {
     return <div className="min-h-screen bg-[#f5f7f8] px-6 py-10 text-sm text-slate-500">Đang tải trình phát khóa học...</div>;
   }
@@ -223,138 +195,46 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
                 <circle className="stroke-gray-200 dark:stroke-dark-border" cx="18" cy="18" fill="none" r="16" strokeWidth="3"></circle>
                 <circle className="stroke-primary" cx="18" cy="18" fill="none" r="16" strokeDasharray="100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" strokeWidth="3"></circle>
               </svg>
-              <div className="absolute left-1/2 top-1/2 text-[10px] font-bold -translate-x-1/2 -translate-y-1/2">{progressPercent}%</div>
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold">{progressPercent}%</div>
             </div>
             <div className="hidden sm:block">
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Tiến độ của bạn</p>
               <p className="text-sm font-bold">{completedCount}/{totalLessons} bài học</p>
             </div>
           </div>
-          <div className="size-9 cursor-pointer rounded-full border-2 border-white bg-cover bg-center bg-no-repeat shadow-sm dark:border-dark-border" style={{ backgroundImage: 'url(https://picsum.photos/seed/user1/100/100)' }}></div>
+          <div className="size-9 rounded-full border-2 border-white bg-cover bg-center bg-no-repeat shadow-sm dark:border-dark-border" style={{ backgroundImage: 'url(https://picsum.photos/seed/user1/100/100)' }}></div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex flex-1 justify-center overflow-y-auto bg-gray-50 p-4 dark:bg-dark-bg md:p-6 lg:p-8">
           <div className="flex w-full max-w-5xl flex-col gap-6">
-<<<<<<< Updated upstream
-            <div className="group relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
+            <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
               <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${course?.thumbnail || 'https://picsum.photos/seed/code/1920/1080'})` }}>
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <button onClick={handleCompleteAndNext} className="flex size-20 items-center justify-center rounded-full bg-primary/90 text-white shadow-lg backdrop-blur-sm transition-all hover:scale-105 hover:bg-primary">
-                    <PlayCircle size={48} className="ml-1" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center text-white">
+                  <PlayCircle size={56} className="text-white/85" />
+                  <div>
+                    <p className="text-2xl font-semibold">{activeLesson?.title || course?.title}</p>
+                    <p className="mt-2 text-sm text-white/75">
+                      {activeLesson ? `Thời lượng ${formatDuration(activeLesson.durationSeconds)}` : 'Nội dung bài học đang được cập nhật.'}
+                    </p>
+                  </div>
+                  <button onClick={handleCompleteAndNext} className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover">
+                    {isCompleted(activeLesson?.id || '') ? 'Bài đã hoàn thành' : 'Đánh dấu hoàn thành'}
                   </button>
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 flex h-16 items-end bg-gradient-to-t from-black/80 to-transparent px-4 pb-4">
-                  <div className="flex w-full flex-col gap-2">
-                    <div className="h-1 w-full overflow-hidden rounded-full bg-white/30">
-                      <div className="h-full bg-primary" style={{ width: `${progressPercent}%` }}></div>
-                    </div>
-                    <div className="flex justify-between text-xs font-medium text-white">
-                      <div className="flex items-center gap-4">
-                        <PlayCircle size={20} />
-                        <Volume2 size={20} />
-                        <span>{activeLesson ? formatDuration(activeLesson.durationSeconds) : '00:00'}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Settings size={20} />
-                        <Maximize size={20} />
-                      </div>
-                    </div>
-=======
-            <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
-              {activeLessonEmbedUrl ? (
-                <iframe
-                  key={activeLesson?.id}
-                  className="absolute inset-0 h-full w-full"
-                  src={activeLessonEmbedUrl}
-                  title={activeLesson?.title || course?.title || 'Video bài học'}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${course?.thumbnail || 'https://picsum.photos/seed/code/1920/1080'})` }}>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/55 px-6 text-center text-white">
-                    <PlayCircle size={56} className="text-white/80" />
-                    <div>
-                      <p className="text-lg font-semibold">Bài học này chưa có video</p>
-                      <p className="mt-2 text-sm text-white/75">Bạn có thể vào quản lý khóa học và dán link phát video Gumlet cho buổi học này.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
 
             <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 dark:border-dark-border md:flex-row md:items-center">
               <div>
                 <h2 className="mb-1 text-2xl font-bold">{activeLesson ? `Bài ${activeLesson.orderIndex}: ${activeLesson.title}` : course?.title}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Giảng viên: {course?.instructor || 'Đang cập nhật'} • Danh mục: {course?.category || 'Tổng hợp'}</p>
-              </div>
-              <div className="shrink-0 flex gap-3">
-                <button onClick={handlePreviousLesson} disabled={activeLessonIndex <= 0} className="flex items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 font-medium transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-card">
-                  <ArrowLeft size={20} /> Bài trước
-                </button>
-                <button onClick={handleNextLesson} disabled={activeLessonIndex < 0 || activeLessonIndex >= lessons.length - 1} className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-medium text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600 disabled:opacity-50">
-                  Bài tiếp theo <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex gap-8 border-b border-gray-200 dark:border-dark-border">
-                <button onClick={() => setActiveTab('desc')} className={`flex items-center gap-2 border-b-2 pb-3 text-sm ${activeTab === 'desc' ? 'border-primary font-bold text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
-                  <Info size={18} /> Mô tả
-                </button>
-                <button onClick={() => setActiveTab('docs')} className={`flex items-center gap-2 border-b-2 pb-3 text-sm ${activeTab === 'docs' ? 'border-primary font-bold text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
-                  <Folder size={18} /> Tài liệu
-                </button>
-                <button onClick={() => setActiveTab('discussion')} className={`flex items-center gap-2 border-b-2 pb-3 text-sm ${activeTab === 'discussion' ? 'border-primary font-bold text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
-                  <MessageSquare size={18} /> Thảo luận
-                </button>
-              </div>
-              <div className="py-6">
-                {activeTab === 'desc' && (
-                  <div className="prose max-w-none text-slate-600 dark:prose-invert dark:text-slate-300">
-                    <h3 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">Về bài học này</h3>
-                    <p className="mb-4 leading-relaxed">
-                      Bạn đang học <strong>{activeLesson?.title || course?.title}</strong>. Hệ thống sẽ tự động lưu tiến độ sau khi bạn hoàn thành từng bài.
-                    </p>
-                    <ul className="mb-6 list-disc space-y-2 pl-5 marker:text-primary">
-                      <li>Tổng số bài học: {totalLessons}</li>
-                      <li>Đã hoàn thành: {completedCount}</li>
-                      <li>Trạng thái ghi danh: {enrollment?.status || 'N/A'}</li>
-                    </ul>
-                    <button onClick={handleCompleteAndNext} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-primary-hover">
-                      Đánh dấu hoàn thành bài này
-                    </button>
->>>>>>> Stashed changes
-                  </div>
-                )}
-                {activeTab === 'docs' && (
-                  <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-slate-600 dark:border-dark-border dark:bg-dark-card dark:text-slate-300">
-                    Tài liệu cho bài học này đang được cập nhật.
-                  </div>
-                )}
-                {activeTab === 'discussion' && (
-                  <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-slate-600 dark:border-dark-border dark:bg-dark-card dark:text-slate-300">
-                    Khu vực thảo luận đang được cập nhật.
-                  </div>
-                )}
-                {error && <p className="mt-4 text-sm text-red-500">{error}</p>}
-                {saving && <p className="mt-4 text-sm text-slate-500">Đang lưu tiến độ...</p>}
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 dark:border-dark-border md:flex-row md:items-center">
-              <div>
-                <h2 className="mb-1 text-2xl font-bold">
-                  {activeLesson ? `Bài ${activeLesson.orderIndex}: ${activeLesson.title}` : course?.title}
-                </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Giảng viên: {course?.instructor || 'Đang cập nhật'} • Danh mục: {course?.category || 'Tổng hợp'}
                 </p>
               </div>
-              <div className="shrink-0 flex gap-3">
+              <div className="flex shrink-0 gap-3">
                 <button onClick={handlePreviousLesson} disabled={activeLessonIndex <= 0} className="flex items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 font-medium transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-card">
                   <ArrowLeft size={20} /> Bài trước
                 </button>
@@ -381,13 +261,16 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
                   <div className="prose max-w-none text-slate-600 dark:prose-invert dark:text-slate-300">
                     <h3 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">Về bài học này</h3>
                     <p className="mb-4 leading-relaxed">
-                      Bạn đang học <strong>{activeLesson?.title || course?.title}</strong>. Hệ thống sẽ tự động lưu tiến độ sau khi bạn hoàn thành từng bài.
+                      Bạn đang học <strong>{activeLesson?.title || course?.title}</strong>. Hệ thống sẽ lưu tiến độ sau mỗi bài hoàn thành để bạn tiếp tục học thuận tiện hơn.
                     </p>
                     <ul className="mb-6 list-disc space-y-2 pl-5 marker:text-primary">
                       <li>Tổng số bài học: {totalLessons}</li>
                       <li>Đã hoàn thành: {completedCount}</li>
                       <li>Trạng thái ghi danh: {enrollment?.status || 'N/A'}</li>
                     </ul>
+                    <button onClick={handleCompleteAndNext} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary-hover">
+                      Đánh dấu hoàn thành bài này
+                    </button>
                   </div>
                 )}
                 {activeTab === 'docs' && (
@@ -447,10 +330,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
                           <PlayCircle size={14} className={isActive ? 'text-primary/70' : 'text-slate-400'} />
                           <span className="text-xs text-slate-500">{formatDuration(lesson.durationSeconds)}</span>
                           {lesson.preview && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Preview</span>}
-<<<<<<< Updated upstream
-=======
-                          {lesson.gumletPlaybackUrl && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">Gumlet</span>}
->>>>>>> Stashed changes
                           {isActive && <span className="ml-auto rounded bg-primary px-1.5 text-[10px] text-white">Đang học</span>}
                         </div>
                       </div>
@@ -479,6 +358,3 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
 };
 
 export default CoursePlayer;
-
-
-
