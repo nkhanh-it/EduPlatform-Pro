@@ -1,6 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Bell, Plus, Filter, Calendar, Eye, Edit, Lock, ChevronLeft, ChevronRight, MoreHorizontal, Mail, Phone, BookOpen, CalendarDays, Shield } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  Plus,
+  Eye,
+  Edit,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Mail,
+  Phone,
+  BookOpen,
+  CalendarDays,
+  Shield,
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import ControlSelect from '../components/filters/ControlSelect';
 import { User } from '../types';
 import { adminCreateStudent, adminGetStudents, adminUpdateStudent, adminUpdateStudentStatus } from '../api';
 import { showAlert } from '../components/dialogs/DialogProvider';
@@ -10,12 +26,23 @@ interface StudentListProps {
   onNavigate: (page: string) => void;
 }
 
+const PAGE_SIZE = 10;
+const getShortId = (value?: string) => (value ? value.replace(/-/g, '').slice(0, 8).toUpperCase() : 'N/A');
+const getUserLabel = (student: User) => student.userCode || getShortId(student.id);
+
+const SORT_LABELS = {
+  LATEST: 'Mới đăng ký nhất',
+  OLDEST: 'Đăng ký lâu nhất',
+  NAME_ASC: 'Tên A-Z',
+  NAME_DESC: 'Tên Z-A',
+} as const;
+
 const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
-  const pageSize = 10;
   const [students, setStudents] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [sortMode, setSortMode] = useState<'LATEST' | 'OLDEST' | 'NAME_ASC' | 'NAME_DESC'>('LATEST');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -56,8 +83,27 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
     );
   }, [search, students]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
-  const paginatedStudents = filteredStudents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const sortedStudents = useMemo(() => {
+    const list = [...filteredStudents];
+    switch (sortMode) {
+      case 'OLDEST':
+        list.sort((a, b) => new Date(a.joinDate || 0).getTime() - new Date(b.joinDate || 0).getTime());
+        break;
+      case 'NAME_ASC':
+        list.sort((a, b) => String(a.name || a.fullName || '').localeCompare(String(b.name || b.fullName || ''), 'vi'));
+        break;
+      case 'NAME_DESC':
+        list.sort((a, b) => String(b.name || b.fullName || '').localeCompare(String(a.name || a.fullName || ''), 'vi'));
+        break;
+      default:
+        list.sort((a, b) => new Date(b.joinDate || 0).getTime() - new Date(a.joinDate || 0).getTime());
+        break;
+    }
+    return list;
+  }, [filteredStudents, sortMode]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedStudents.length / PAGE_SIZE));
+  const paginatedStudents = sortedStudents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -107,7 +153,12 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
     if (formValues.fullName.trim().length < 2) nextErrors.fullName = 'Họ và tên tối thiểu 2 ký tự.';
     const emailError = emailValidator(formValues.email);
     if (emailError) nextErrors.email = emailError;
-    if (studentFormMode === 'create' && formValues.password.trim().length < 6) nextErrors.password = 'Mật khẩu tối thiểu 6 ký tự.';
+    if (studentFormMode === 'create' && formValues.password.trim().length < 6) {
+      nextErrors.password = 'Mật khẩu tối thiểu 6 ký tự.';
+    }
+    if (studentFormMode === 'edit' && formValues.password.trim() && formValues.password.trim().length < 6) {
+      nextErrors.password = 'Mật khẩu mới tối thiểu 6 ký tự.';
+    }
     const phoneError = phoneValidator(formValues.phone);
     if (phoneError) nextErrors.phone = phoneError;
     setFormErrors(nextErrors);
@@ -138,6 +189,7 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
           fullName: formValues.fullName.trim(),
           email: formValues.email.trim(),
           phone: formValues.phone.trim() || undefined,
+          password: formValues.password.trim() || undefined,
         });
       }
 
@@ -157,120 +209,137 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
     <div className="flex h-screen overflow-hidden bg-[#f5f7f8] text-slate-900 dark:bg-[#101922] dark:text-white">
       <Sidebar role="admin" activePage="admin-students" onNavigate={onNavigate} />
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <div className="relative flex h-full flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-50 flex items-center justify-between border-b border-gray-200 bg-white/90 px-6 py-3 backdrop-blur-md dark:border-dark-border dark:bg-dark-card/90">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-bold leading-tight">Quản lý học viên</h2>
           </div>
-          <div className="flex flex-1 justify-end gap-6 items-center">
-            <button onClick={() => showInfoToast('Không có thông báo mới.')} className="relative text-slate-500 hover:text-primary transition-colors">
+          <div className="flex flex-1 items-center justify-end gap-6">
+            <button onClick={() => showInfoToast('Không có thông báo mới.')} className="relative text-slate-500 transition-colors hover:text-primary">
               <Bell size={20} />
-              <span className="absolute top-0 right-0 size-2 rounded-full border-2 border-white bg-red-500 dark:border-dark-bg"></span>
+              <span className="absolute right-0 top-0 size-2 rounded-full border-2 border-white bg-red-500 dark:border-dark-bg"></span>
             </button>
             <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
+              <div className="hidden text-right sm:block">
                 <p className="text-sm font-bold leading-none">Admin User</p>
-                <p className="text-xs text-slate-500 mt-1">Quản trị viên</p>
+                <p className="mt-1 text-xs text-slate-500">Quản trị viên</p>
               </div>
-              <div className="size-10 rounded-full bg-cover bg-center border-2 border-gray-200 dark:border-dark-border" style={{ backgroundImage: 'url(https://picsum.photos/seed/admin/100/100)' }}></div>
+              <div className="size-10 rounded-full border-2 border-gray-200 bg-cover bg-center dark:border-dark-border" style={{ backgroundImage: 'url(https://picsum.photos/seed/admin/100/100)' }}></div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 flex justify-center py-8 px-4 sm:px-6 lg:px-8 overflow-y-auto">
-          <div className="w-full max-w-[1200px] flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <main className="flex flex-1 justify-center overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex w-full max-w-[1200px] flex-col gap-6">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Quản lý học viên</h1>
-                <p className="text-slate-500 dark:text-slate-400 mt-1">Danh sách và thông tin học viên trong hệ thống.</p>
+                <p className="mt-1 text-slate-500 dark:text-slate-400">Danh sách và thông tin học viên trong hệ thống.</p>
               </div>
-              <button onClick={openCreateModal} className="flex items-center justify-center gap-2 rounded-xl h-12 px-6 bg-primary hover:bg-blue-600 transition-all text-white text-sm font-bold shadow-lg shadow-primary/30">
+              <button onClick={openCreateModal} className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-white shadow-lg shadow-primary/30 transition-all hover:bg-blue-600">
                 <Plus size={20} />
                 <span>Thêm học viên mới</span>
               </button>
             </div>
 
-            <div className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border p-4 flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-dark-border dark:bg-dark-card">
+              <div className="flex flex-col gap-4 md:flex-row">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl h-11 pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" placeholder="Tìm kiếm theo tên, email hoặc số điện thoại..." />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 dark:border-dark-border dark:bg-dark-bg"
+                    placeholder="Tìm kiếm theo tên, email hoặc số điện thoại..."
+                  />
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => showInfoToast('Đang lọc theo dữ liệu hiện có trong bảng.')} className="flex items-center gap-2 h-11 px-4 rounded-xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border font-medium text-sm hover:border-primary transition-colors">
-                    <Calendar size={18} />
-                    <span>Ngày đăng ký</span>
-                  </button>
-                  <button onClick={() => showInfoToast(`Bộ lọc hiện tại: ${statusFilter || 'ALL'}`)} className="flex items-center gap-2 h-11 px-4 rounded-xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border font-medium text-sm hover:border-primary transition-colors">
-                    <Filter size={18} />
-                    <span>Bộ lọc khác</span>
-                  </button>
+                  <ControlSelect
+                    value={sortMode}
+                    onChange={(value) => setSortMode(value as typeof sortMode)}
+                    options={[
+                      { value: 'LATEST', label: SORT_LABELS.LATEST },
+                      { value: 'OLDEST', label: SORT_LABELS.OLDEST },
+                      { value: 'NAME_ASC', label: SORT_LABELS.NAME_ASC },
+                      { value: 'NAME_DESC', label: SORT_LABELS.NAME_DESC },
+                    ]}
+                  />
                 </div>
               </div>
-              <div className="flex gap-2 flex-wrap items-center">
-                <span className="text-sm font-medium text-slate-500 mr-2">Trạng thái:</span>
-                <button onClick={() => load()} className="h-8 px-4 rounded-lg bg-gray-100 dark:bg-dark-border text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Tất cả</button>
-                <button onClick={() => load('ACTIVE')} className="h-8 px-4 rounded-lg border border-gray-200 dark:border-dark-border text-slate-500 text-sm font-medium hover:text-primary hover:border-primary transition-colors">Đang hoạt động</button>
-                <button onClick={() => load('LOCKED')} className="h-8 px-4 rounded-lg border border-gray-200 dark:border-dark-border text-slate-500 text-sm font-medium hover:text-primary hover:border-primary transition-colors">Đã khóa</button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-2 text-sm font-medium text-slate-500">Trạng thái:</span>
+                <button onClick={() => load()} className="h-8 rounded-lg bg-gray-100 px-4 text-sm font-medium transition-colors hover:bg-gray-200 dark:bg-dark-border dark:hover:bg-gray-700">Tất cả</button>
+                <button onClick={() => load('ACTIVE')} className="h-8 rounded-lg border border-gray-200 px-4 text-sm font-medium text-slate-500 transition-colors hover:border-primary hover:text-primary dark:border-dark-border">Đang hoạt động</button>
+                <button onClick={() => load('LOCKED')} className="h-8 rounded-lg border border-gray-200 px-4 text-sm font-medium text-slate-500 transition-colors hover:border-primary hover:text-primary dark:border-dark-border">Đã khóa</button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                <span className="rounded-full bg-gray-50 px-3 py-1.5 ring-1 ring-gray-200 dark:bg-dark-bg dark:ring-dark-border">
+                  Trạng thái: {statusFilter || 'Tất cả'}
+                </span>
+                <span className="rounded-full bg-gray-50 px-3 py-1.5 ring-1 ring-gray-200 dark:bg-dark-bg dark:ring-dark-border">
+                  Sắp xếp: {SORT_LABELS[sortMode]}
+                </span>
               </div>
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
 
-            <div className="flex flex-col flex-1 overflow-hidden rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-card shadow-sm">
+            <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-border dark:bg-dark-card">
               <div className="flex-1 overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50 dark:bg-dark-bg sticky top-0 z-10">
+                <table className="w-full border-collapse text-left">
+                  <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-dark-bg">
                     <tr>
-                      <th className="p-4 w-[50px] text-center"><input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 bg-transparent text-primary focus:ring-primary size-4" /></th>
-                      <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Học viên</th>
-                      <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Liên hệ</th>
-                      <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Ngày đăng ký</th>
-                      <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center">Khóa học</th>
-                      <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                      <th className="p-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">Hành động</th>
+                      <th className="w-[50px] p-4 text-center"><input type="checkbox" className="size-4 rounded border-gray-300 bg-transparent text-primary focus:ring-primary dark:border-gray-600" /></th>
+                      <th className="p-4 text-xs font-medium uppercase tracking-wider text-slate-500">Học viên</th>
+                      <th className="p-4 text-xs font-medium uppercase tracking-wider text-slate-500">Liên hệ</th>
+                      <th className="p-4 text-xs font-medium uppercase tracking-wider text-slate-500">Ngày đăng ký</th>
+                      <th className="p-4 text-center text-xs font-medium uppercase tracking-wider text-slate-500">Khóa học</th>
+                      <th className="p-4 text-xs font-medium uppercase tracking-wider text-slate-500">Trạng thái</th>
+                      <th className="p-4 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Hành động</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-dark-border text-sm">
+                  <tbody className="divide-y divide-gray-100 text-sm dark:divide-dark-border">
                     {paginatedStudents.map((student) => (
-                      <tr key={student.id} className="group hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
-                        <td className="p-4 text-center"><input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 bg-transparent text-primary focus:ring-primary size-4" /></td>
+                      <tr key={student.id} className="group transition-colors hover:bg-gray-50 dark:hover:bg-dark-border/30">
+                        <td className="p-4 text-center"><input type="checkbox" className="size-4 rounded border-gray-300 bg-transparent text-primary focus:ring-primary dark:border-gray-600" /></td>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-full bg-cover bg-center border border-gray-200 dark:border-dark-border" style={{ backgroundImage: `url(${student.avatar || student.avatarUrl || 'https://picsum.photos/seed/user/100/100'})` }}></div>
+                            <div className="size-10 rounded-full border border-gray-200 bg-cover bg-center dark:border-dark-border" style={{ backgroundImage: `url(${student.avatar || student.avatarUrl || 'https://picsum.photos/seed/user/100/100'})` }}></div>
                             <div>
                               <p className="font-bold">{student.name || student.fullName}</p>
-                              <p className="text-xs text-slate-500">{student.id}</p>
+                              <p className="text-xs text-slate-500">{getUserLabel(student)}</p>
                             </div>
                           </div>
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col">
                             <span className="truncate">{student.email}</span>
-                            <span className="text-xs text-slate-500 mt-0.5">{student.phone}</span>
+                            <span className="mt-0.5 text-xs text-slate-500">{student.phone}</span>
                           </div>
                         </td>
                         <td className="p-4 text-slate-600 dark:text-slate-400">{student.joinDate}</td>
                         <td className="p-4 text-center">
-                          <span className="inline-flex items-center justify-center size-7 rounded-full bg-gray-100 dark:bg-dark-border text-xs font-bold">{student.coursesEnrolled || 0}</span>
+                          <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 text-xs font-bold dark:bg-dark-border">{student.coursesEnrolled || 0}</span>
                         </td>
                         <td className="p-4">
-                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                          <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
                             student.status === 'ACTIVE'
-                              ? 'bg-green-500/10 text-green-600 border-green-500/10'
+                              ? 'border-green-500/10 bg-green-500/10 text-green-600'
                               : student.status === 'LOCKED'
-                              ? 'bg-red-500/10 text-red-600 border-red-500/10'
-                              : 'bg-slate-500/10 text-slate-600 border-slate-500/10'
+                                ? 'border-red-500/10 bg-red-500/10 text-red-600'
+                                : 'border-slate-500/10 bg-slate-500/10 text-slate-600'
                           }`}>
                             <div className="size-1.5 rounded-full bg-current"></div>
                             {student.status === 'ACTIVE' ? 'Đang hoạt động' : student.status === 'LOCKED' ? 'Đã khóa' : 'Chưa xác thực'}
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleView(student)} className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"><Eye size={18} /></button>
-                            <button onClick={() => openEditModal(student)} className="p-1.5 text-slate-500 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"><Edit size={18} /></button>
-                            <button onClick={() => toggleLock(student)} className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Lock size={18} /></button>
+                          <div className="flex items-center justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                            <button onClick={() => handleView(student)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-primary/10 hover:text-primary"><Eye size={18} /></button>
+                            <button onClick={() => openEditModal(student)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-amber-500/10 hover:text-amber-500"><Edit size={18} /></button>
+                            <button onClick={() => toggleLock(student)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-500"><Lock size={18} /></button>
                           </div>
                         </td>
                       </tr>
@@ -278,21 +347,24 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
                   </tbody>
                 </table>
               </div>
-              <div className="border-t border-gray-200 dark:border-dark-border p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 dark:bg-dark-bg">
-                <div className="text-sm text-slate-500">Hiển thị <span className="font-medium text-slate-900 dark:text-white">{filteredStudents.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredStudents.length)}</span> trong số <span className="font-medium text-slate-900 dark:text-white">{filteredStudents.length}</span> học viên</div>
+
+              <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 p-4 sm:flex-row dark:border-dark-border dark:bg-dark-bg">
+                <div className="text-sm text-slate-500">
+                  Hiển thị <span className="font-medium text-slate-900 dark:text-white">{filteredStudents.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredStudents.length)}</span> trong số <span className="font-medium text-slate-900 dark:text-white">{filteredStudents.length}</span> học viên
+                </div>
                 <div className="flex items-center gap-2">
                   <div className="flex">
-                    <button onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="flex items-center justify-center h-9 px-3 rounded-l-lg border border-r-0 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-card text-slate-500 hover:text-primary hover:bg-gray-50 transition-colors disabled:opacity-50"><ChevronLeft size={18} /></button>
+                    <button onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="flex h-9 items-center justify-center rounded-l-lg border border-r-0 border-gray-300 bg-white px-3 text-slate-500 transition-colors hover:bg-gray-50 hover:text-primary disabled:opacity-50 dark:border-dark-border dark:bg-dark-card"><ChevronLeft size={18} /></button>
                     {Array.from({ length: Math.min(totalPages, 3) }, (_, index) => {
                       const pageNumber = index + 1;
                       return (
-                        <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} className={`flex items-center justify-center h-9 w-9 border border-r-0 border-gray-300 dark:border-dark-border text-sm font-medium ${currentPage === pageNumber ? 'bg-primary text-white' : 'bg-white dark:bg-dark-card text-slate-700 dark:text-slate-400 hover:bg-gray-50 transition-colors'}`}>
+                        <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} className={`flex h-9 w-9 items-center justify-center border border-r-0 border-gray-300 text-sm font-medium dark:border-dark-border ${currentPage === pageNumber ? 'bg-primary text-white' : 'bg-white text-slate-700 transition-colors hover:bg-gray-50 dark:bg-dark-card dark:text-slate-400'}`}>
                           {pageNumber}
                         </button>
                       );
                     })}
-                    {totalPages > 3 && <span className="flex items-center justify-center h-9 w-9 border border-r-0 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-card text-slate-500 text-sm"><MoreHorizontal size={14} /></span>}
-                    <button onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} className="flex items-center justify-center h-9 px-3 rounded-r-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-card text-slate-500 hover:text-primary hover:bg-gray-50 transition-colors disabled:opacity-50"><ChevronRight size={18} /></button>
+                    {totalPages > 3 && <span className="flex h-9 w-9 items-center justify-center border border-r-0 border-gray-300 bg-white text-sm text-slate-500 dark:border-dark-border dark:bg-dark-card"><MoreHorizontal size={14} /></span>}
+                    <button onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} className="flex h-9 items-center justify-center rounded-r-lg border border-gray-300 bg-white px-3 text-slate-500 transition-colors hover:bg-gray-50 hover:text-primary disabled:opacity-50 dark:border-dark-border dark:bg-dark-card"><ChevronRight size={18} /></button>
                   </div>
                 </div>
               </div>
@@ -303,7 +375,7 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
 
       {selectedStudent && (
         <div className="fixed inset-0 z-[155] flex items-center justify-center px-4 py-6">
-          <button className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => setSelectedStudent(null)} aria-label="Close student detail overlay" />
+          <button className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => setSelectedStudent(null)} aria-label="Đóng chi tiết học viên" />
           <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:border-dark-border dark:bg-dark-card">
             <div className="border-b border-gray-100 px-6 py-5 dark:border-dark-border">
               <div className="flex items-center justify-between gap-4">
@@ -319,13 +391,13 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
               <div className="rounded-2xl border border-gray-200 bg-slate-50 p-5 dark:border-dark-border dark:bg-dark-bg">
                 <div className="mx-auto mb-4 size-24 rounded-full border-4 border-white bg-cover bg-center shadow-md dark:border-dark-card" style={{ backgroundImage: `url(${selectedStudent.avatar || selectedStudent.avatarUrl || 'https://picsum.photos/seed/user/160/160'})` }}></div>
                 <h4 className="text-center text-lg font-bold">{selectedStudent.fullName || selectedStudent.name}</h4>
-                <p className="mt-1 text-center text-sm text-slate-500">{selectedStudent.id}</p>
+                <p className="mt-1 text-center text-sm text-slate-500">{getUserLabel(selectedStudent)}</p>
                 <div className={`mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold ${
                   selectedStudent.status === 'ACTIVE'
                     ? 'bg-green-500/10 text-green-600'
                     : selectedStudent.status === 'LOCKED'
-                    ? 'bg-red-500/10 text-red-600'
-                    : 'bg-slate-500/10 text-slate-600'
+                      ? 'bg-red-500/10 text-red-600'
+                      : 'bg-slate-500/10 text-slate-600'
                 }`}>
                   <Shield size={14} />
                   {selectedStudent.status === 'ACTIVE' ? 'Đang hoạt động' : selectedStudent.status === 'LOCKED' ? 'Đã khóa' : 'Chưa xác thực'}
@@ -335,7 +407,7 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-dark-border dark:bg-dark-bg">
                   <div className="mb-2 flex items-center gap-2 text-slate-500"><Mail size={16} /> Email</div>
-                  <p className="font-semibold break-all">{selectedStudent.email || 'Chưa cập nhật'}</p>
+                  <p className="break-all font-semibold">{selectedStudent.email || 'Chưa cập nhật'}</p>
                 </div>
                 <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-dark-border dark:bg-dark-bg">
                   <div className="mb-2 flex items-center gap-2 text-slate-500"><Phone size={16} /> Số điện thoại</div>
@@ -368,12 +440,12 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
 
       {isStudentModalOpen && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center px-4 py-6">
-          <button className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={closeStudentModal} aria-label="Close student form overlay" />
+          <button className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={closeStudentModal} aria-label="Đóng form học viên" />
           <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:border-dark-border dark:bg-dark-card">
             <div className="border-b border-gray-100 px-6 py-5 dark:border-dark-border">
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">{studentFormMode === 'create' ? 'Thêm học viên mới' : 'Cập nhật học viên'}</h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {studentFormMode === 'create' ? 'Nhập đầy đủ thông tin để tạo học viên mới.' : 'Cập nhật thông tin học viên và lưu lại danh sách.'}
+                {studentFormMode === 'create' ? 'Nhập đầy đủ thông tin để tạo học viên mới.' : 'Cập nhật thông tin học viên, hoặc nhập mật khẩu mới nếu cần đổi.'}
               </p>
             </div>
 
@@ -391,8 +463,8 @@ const StudentList: React.FC<StudentListProps> = ({ onNavigate }) => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Mật khẩu {studentFormMode === 'create' ? '*' : '(giữ nguyên khi sửa)'}</label>
-                <input type="password" value={formValues.password} onChange={(event) => setFormValues((prev) => ({ ...prev, password: event.target.value }))} disabled={studentFormMode === 'edit'} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-border dark:bg-dark-bg dark:text-white" placeholder="Tối thiểu 6 ký tự" />
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Mật khẩu {studentFormMode === 'create' ? '*' : '(để trống nếu giữ nguyên)'}</label>
+                <input type="password" value={formValues.password} onChange={(event) => setFormValues((prev) => ({ ...prev, password: event.target.value }))} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-bg dark:text-white" placeholder={studentFormMode === 'create' ? 'Tối thiểu 6 ký tự' : 'Nhập mật khẩu mới nếu muốn đổi'} />
                 {formErrors.password && <p className="text-sm text-red-500">{formErrors.password}</p>}
               </div>
 

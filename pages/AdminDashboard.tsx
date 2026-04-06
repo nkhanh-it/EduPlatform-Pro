@@ -71,26 +71,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const points = await adminGetRevenuePoints();
-        setRevenuePoints(points as any[]);
-      } catch {
-        setRevenuePoints([]);
-      }
+      const [pointsResult, summaryResult, transactionsResult] = await Promise.allSettled([
+        adminGetRevenuePoints(),
+        adminGetRevenueSummary(),
+        adminGetTransactions(),
+      ]);
 
-      try {
-        const sum = await adminGetRevenueSummary();
-        setSummary(sum);
-      } catch {
-        setSummary(null);
-      }
-
-      try {
-        const txs = await adminGetTransactions();
-        setTransactions(txs as any[]);
-      } catch {
-        setTransactions([]);
-      }
+      setRevenuePoints(pointsResult.status === 'fulfilled' ? (pointsResult.value as any[]) : []);
+      setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
+      setTransactions(transactionsResult.status === 'fulfilled' ? (transactionsResult.value as any[]) : []);
     };
 
     load();

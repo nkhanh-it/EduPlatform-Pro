@@ -2,6 +2,7 @@
 import { Bell, Calendar, Download, TrendingUp, CreditCard, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts';
 import Sidebar from '../components/Sidebar';
+import ControlSelect from '../components/filters/ControlSelect';
 import { adminGetRevenuePoints, adminGetRevenueSummary, adminGetTransactions } from '../api';
 import { showInfoToast, showSuccessToast } from '../components/feedback/ToastProvider';
 
@@ -9,12 +10,15 @@ interface AdminRevenueProps {
   onNavigate: (page: string) => void;
 }
 
+const getShortId = (value?: string) => (value ? value.replace(/-/g, '').slice(0, 8).toUpperCase() : 'N/A');
+
 const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
   const [summary, setSummary] = useState<any | null>(null);
   const [points, setPoints] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
   const [periodDays, setPeriodDays] = useState<30 | 90 | 365>(30);
+  const [sortMode, setSortMode] = useState<'LATEST' | 'OLDEST' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('LATEST');
 
   const filteredTransactions = useMemo(() => {
     const now = Date.now();
@@ -24,11 +28,30 @@ const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
     });
   }, [transactions, periodDays]);
 
+  const sortedTransactions = useMemo(() => {
+    const list = [...filteredTransactions];
+    switch (sortMode) {
+      case 'OLDEST':
+        list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+        break;
+      case 'AMOUNT_DESC':
+        list.sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+        break;
+      case 'AMOUNT_ASC':
+        list.sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
+        break;
+      default:
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        break;
+    }
+    return list;
+  }, [filteredTransactions, sortMode]);
+
   const filteredPoints = useMemo(() => (periodDays === 365 ? points : points.slice(-(periodDays === 30 ? 6 : 12))), [periodDays, points]);
 
   const handleExport = () => {
-    const headers = ['id', 'userId', 'courseTitle', 'amount', 'status', 'method', 'createdAt'];
-    const rows = filteredTransactions.map((t) => [t.id, t.userId, t.courseTitle, t.amount, t.status, t.method, t.createdAt]);
+    const headers = ['id', 'customerName', 'courseTitle', 'amount', 'status', 'method', 'createdAt'];
+    const rows = sortedTransactions.map((t) => [t.id, t.userFullName || t.userId, t.courseTitle, t.amount, t.status, t.method, t.createdAt]);
     const csv = [headers, ...rows].map((row) => row.map((v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -42,21 +65,15 @@ const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     (async () => {
-      try {
-        setSummary(await adminGetRevenueSummary());
-      } catch {
-        setSummary(null);
-      }
-      try {
-        setPoints(await adminGetRevenuePoints());
-      } catch {
-        setPoints([]);
-      }
-      try {
-        setTransactions(await adminGetTransactions());
-      } catch {
-        setTransactions([]);
-      }
+      const [summaryResult, pointsResult, transactionsResult] = await Promise.allSettled([
+        adminGetRevenueSummary(),
+        adminGetRevenuePoints(),
+        adminGetTransactions(),
+      ]);
+
+      setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
+      setPoints(pointsResult.status === 'fulfilled' ? pointsResult.value : []);
+      setTransactions(transactionsResult.status === 'fulfilled' ? transactionsResult.value : []);
     })();
   }, []);
 
@@ -82,11 +99,36 @@ const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
                   <Calendar size={18} />
                   {periodDays === 30 ? '30 ngày' : periodDays === 90 ? '90 ngày' : '12 tháng'}
                 </button>
+                <ControlSelect
+                  value={sortMode}
+                  onChange={(value) => setSortMode(value as typeof sortMode)}
+                  options={[
+                    { value: 'LATEST', label: 'Mới nhất' },
+                    { value: 'OLDEST', label: 'Cũ nhất' },
+                    { value: 'AMOUNT_DESC', label: 'Tiền cao đến thấp' },
+                    { value: 'AMOUNT_ASC', label: 'Tiền thấp đến cao' },
+                  ]}
+                  className="min-w-[190px]"
+                />
                 <button onClick={handleExport} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:bg-primary-hover">
                   <Download size={18} />
                   Xuất báo cáo
                 </button>
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+              <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-gray-200 dark:bg-dark-card dark:ring-dark-border">
+                Khoảng thời gian: {periodDays === 30 ? '30 ngày' : periodDays === 90 ? '90 ngày' : '12 tháng'}
+              </span>
+              <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-gray-200 dark:bg-dark-card dark:ring-dark-border">
+                Sắp xếp: {{
+                  LATEST: 'Mới nhất',
+                  OLDEST: 'Cũ nhất',
+                  AMOUNT_DESC: 'Tiền cao đến thấp',
+                  AMOUNT_ASC: 'Tiền thấp đến cao',
+                }[sortMode]}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -178,10 +220,10 @@ const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-                    {filteredTransactions.map((tx: any) => (
+                    {sortedTransactions.map((tx: any) => (
                       <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-dark-border/30">
-                        <td className="p-4 font-mono text-xs text-slate-500">{tx.id}</td>
-                        <td className="p-4 font-medium">{tx.userId?.slice(0, 6)}</td>
+                        <td className="p-4 font-mono text-xs text-slate-500">{getShortId(tx.id)}</td>
+                        <td className="p-4 font-medium">{tx.userFullName || 'Đang cập nhật'}</td>
                         <td className="p-4 text-slate-600 dark:text-slate-300">{tx.courseTitle}</td>
                         <td className="p-4 text-slate-500">{new Date(tx.createdAt).toLocaleString()}</td>
                         <td className="p-4 font-bold">{Number(tx.amount).toLocaleString('vi-VN')}đ</td>
@@ -213,11 +255,11 @@ const AdminRevenue: React.FC<AdminRevenueProps> = ({ onNavigate }) => {
               <div className="space-y-5">
                 <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-dark-border dark:bg-dark-bg">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Mã giao dịch</p>
-                  <p className="mt-2 font-mono text-sm">{selectedTransaction.id}</p>
+                  <p className="mt-2 font-mono text-sm">{getShortId(selectedTransaction.id)}</p>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Khách hàng</p>
-                      <p className="mt-2 font-semibold">{selectedTransaction.userId || 'Đang cập nhật'}</p>
+                      <p className="mt-2 font-semibold">{selectedTransaction.userFullName || 'Đang cập nhật'}</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Khóa học</p>
