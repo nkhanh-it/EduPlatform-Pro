@@ -35,6 +35,12 @@ public class LessonController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/courses/{courseId}/lessons")
+    public ResponseEntity<List<LessonDto>> listAdminLessons(@PathVariable UUID courseId) {
+        return ResponseEntity.ok(lessonService.listByCourse(courseId));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/courses/{courseId}/lessons")
     public ResponseEntity<LessonDto> createLesson(@PathVariable UUID courseId,
                                                   @Valid @RequestBody LessonCreateRequest request) {
