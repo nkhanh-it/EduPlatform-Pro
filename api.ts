@@ -48,7 +48,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         clearAuthSession();
       }
 
-      let message = 'Đã xảy ra lỗi, vui lòng thử lại.';
+      let message = 'Da xay ra loi, vui long thu lai.';
       try {
         const errorBody = await response.json();
         if (errorBody?.message) {
@@ -56,6 +56,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         }
       } catch {
         // ignore
+      }
+      if (message === 'Unexpected error occurred') {
+        message = 'Da xay ra loi, vui long thu lai.';
       }
       throw new Error(message);
     }
@@ -83,7 +86,7 @@ export type StoredUser = {
   email: string;
   avatarUrl?: string;
   phone?: string;
-  role: 'ADMIN' | 'STUDENT';
+  role: 'ADMIN' | 'STUDENT' | 'INSTRUCTOR';
   status?: string;
   bio?: string;
 };
@@ -104,16 +107,28 @@ export type LessonDto = {
   orderIndex: number;
   durationSeconds: number;
   preview: boolean;
+  gumletPlaybackUrl?: string | null;
 };
 
 export type TransactionDto = {
   id: string;
   userId: string;
+  userFullName?: string;
   courseTitle: string;
   amount: number;
   status: string;
   method: string;
+  provider: string;
+  externalRef?: string;
+  gatewayResponseCode?: string;
+  paidAt?: string;
   createdAt: string;
+};
+
+export type PaymentInitResponse = {
+  transactionId: string;
+  status: string;
+  paymentUrl: string;
 };
 
 export type RevenueSummary = {
@@ -169,6 +184,42 @@ export async function getCourse(id: string) {
 
 export async function getCourseLessons(courseId: string) {
   return request<LessonDto[]>(`/api/courses/${courseId}/lessons`);
+}
+
+export async function adminGetCourseLessons(courseId: string) {
+  return request<LessonDto[]>(`/api/admin/courses/${courseId}/lessons`);
+}
+
+export async function adminCreateLesson(courseId: string, payload: {
+  title: string;
+  orderIndex: number;
+  durationSeconds: number;
+  preview: boolean;
+  gumletPlaybackUrl?: string;
+}) {
+  return request<LessonDto>(`/api/courses/${courseId}/lessons`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminUpdateLesson(lessonId: string, payload: {
+  title?: string;
+  orderIndex?: number;
+  durationSeconds?: number;
+  preview?: boolean;
+  gumletPlaybackUrl?: string;
+}) {
+  return request<LessonDto>(`/api/lessons/${lessonId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminDeleteLesson(lessonId: string) {
+  return request<void>(`/api/lessons/${lessonId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function getCategories() {
@@ -228,10 +279,14 @@ export async function updateEnrollmentProgress(
 }
 
 export async function checkout(courseId: string, method: 'CARD' | 'MOMO' | 'QR') {
-  return request<TransactionDto>('/api/checkout', {
+  return request<PaymentInitResponse>('/api/checkout', {
     method: 'POST',
     body: JSON.stringify({ courseId, method }),
   });
+}
+
+export async function getTransaction(id: string) {
+  return request<TransactionDto>(`/api/transactions/${id}`);
 }
 
 export async function adminGetStudents(status?: string) {
@@ -273,6 +328,7 @@ export async function adminUpdateStudent(payload: {
   fullName: string;
   email: string;
   phone?: string;
+  password?: string;
 }) {
   const { id, ...rest } = payload;
   return request<any>(`/api/admin/students/${id}`, {
@@ -283,7 +339,7 @@ export async function adminUpdateStudent(payload: {
 
 export async function adminCreateCourse(payload: {
   title: string;
-  instructorName: string;
+  instructorName?: string;
   price: number;
   originalPrice?: number;
   thumbnailUrl?: string;
