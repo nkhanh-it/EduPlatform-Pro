@@ -32,6 +32,12 @@ const formatDuration = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
+const getGumletEmbedUrl = (lesson: Lesson | null) => {
+  if (!lesson) return null;
+  const rawUrl = lesson.gumletPlaybackUrl?.trim();
+  return rawUrl || null;
+};
+
 const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'desc' | 'docs' | 'discussion'>('desc');
   const [course, setCourse] = useState<Course | null>(null);
@@ -105,6 +111,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
 
   const activeLessonIndex = lessons.findIndex((lesson) => lesson.id === activeLessonId);
   const activeLesson = activeLessonIndex >= 0 ? lessons[activeLessonIndex] : null;
+  const activeLessonEmbedUrl = getGumletEmbedUrl(activeLesson);
   const completedCount = completedLessonIds.length;
   const totalLessons = lessons.length || enrollment?.totalLessons || 0;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
@@ -210,21 +217,40 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
         <main className="flex flex-1 justify-center overflow-y-auto bg-gray-50 p-4 dark:bg-dark-bg md:p-6 lg:p-8">
           <div className="flex w-full max-w-5xl flex-col gap-6">
             <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${course?.thumbnail || 'https://picsum.photos/seed/code/1920/1080'})` }}>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center text-white">
-                  <PlayCircle size={56} className="text-white/85" />
-                  <div>
-                    <p className="text-2xl font-semibold">{activeLesson?.title || course?.title}</p>
-                    <p className="mt-2 text-sm text-white/75">
-                      {activeLesson ? `Thời lượng ${formatDuration(activeLesson.durationSeconds)}` : 'Nội dung bài học đang được cập nhật.'}
-                    </p>
+              {activeLessonEmbedUrl ? (
+                <>
+                  <iframe
+                    key={activeLesson.id}
+                    className="absolute inset-0 h-full w-full"
+                    src={activeLessonEmbedUrl}
+                    title={activeLesson?.title || course?.title || 'Course video player'}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
+                  <div className="absolute bottom-4 right-4">
+                    <button onClick={handleCompleteAndNext} className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover">
+                      {isCompleted(activeLesson?.id || '') ? 'Bài đã hoàn thành' : 'Đánh dấu hoàn thành'}
+                    </button>
                   </div>
-                  <button onClick={handleCompleteAndNext} className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover">
-                    {isCompleted(activeLesson?.id || '') ? 'Bài đã hoàn thành' : 'Đánh dấu hoàn thành'}
-                  </button>
+                </>
+              ) : (
+                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${course?.thumbnail || 'https://picsum.photos/seed/code/1920/1080'})` }}>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center text-white">
+                    <PlayCircle size={56} className="text-white/85" />
+                    <div>
+                      <p className="text-2xl font-semibold">{activeLesson?.title || course?.title}</p>
+                      <p className="mt-2 text-sm text-white/75">
+                        {activeLesson ? `Thời lượng ${formatDuration(activeLesson.durationSeconds)}` : 'Nội dung bài học đang được cập nhật.'}
+                      </p>
+                    </div>
+                    <button onClick={handleCompleteAndNext} className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover">
+                      {isCompleted(activeLesson?.id || '') ? 'Bài đã hoàn thành' : 'Đánh dấu hoàn thành'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 dark:border-dark-border md:flex-row md:items-center">
@@ -329,6 +355,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
                         <div className="mt-1 flex items-center gap-2">
                           <PlayCircle size={14} className={isActive ? 'text-primary/70' : 'text-slate-400'} />
                           <span className="text-xs text-slate-500">{formatDuration(lesson.durationSeconds)}</span>
+                          {lesson.gumletPlaybackUrl && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">Gumlet</span>}
                           {lesson.preview && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Preview</span>}
                           {isActive && <span className="ml-auto rounded bg-primary px-1.5 text-[10px] text-white">Đang học</span>}
                         </div>
