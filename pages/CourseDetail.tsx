@@ -11,6 +11,7 @@ import {
   Sparkles,
   Star,
   Users,
+  X,
 } from 'lucide-react';
 import { getCourse, getCourseLessons, getMyEnrollments, getSelectedCourseId, setSelectedCourseId, setSelectedLessonId } from '../api';
 import { Course, Enrollment, Lesson } from '../types';
@@ -30,6 +31,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [previewLessonId, setPreviewLessonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -78,16 +80,18 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
   const role = (() => {
     try {
       const raw = localStorage.getItem('authUser');
-      return raw ? JSON.parse(raw).role as 'ADMIN' | 'STUDENT' : null;
+      return raw ? JSON.parse(raw).role as 'ADMIN' | 'STUDENT' | 'INSTRUCTOR' : null;
     } catch {
       return null;
     }
   })();
-  const isStudent = role === 'STUDENT';
   const isAdmin = role === 'ADMIN';
+  const isInstructor = role === 'INSTRUCTOR';
   const isEnrolled = Boolean(enrollment);
   const firstLesson = lessons[0] || null;
   const previewLesson = lessons.find((lesson) => lesson.preview) || firstLesson;
+  const activePreviewLesson = lessons.find((lesson) => lesson.id === previewLessonId) || null;
+  const canPreview = Boolean(previewLesson?.preview && previewLesson.gumletPlaybackUrl);
 
   const heroDescription = useMemo(() => {
     if (course?.description?.trim()) {
@@ -119,7 +123,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
 
     setSelectedCourseId(course.id);
 
-    if (isAdmin) {
+    if (isAdmin || isInstructor) {
       onNavigate('admin-courses');
       return;
     }
@@ -140,7 +144,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
     onNavigate('checkout');
   };
 
-  const primaryActionLabel = isAdmin
+  const primaryActionLabel = isAdmin || isInstructor
     ? 'Quay lại quản lý khóa học'
     : isEnrolled
       ? 'Học ngay'
@@ -149,6 +153,13 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
         : 'Mua khóa học';
 
   const secondaryActionLabel = isEnrolled ? 'Xem bài học' : 'Xem nội dung khóa học';
+
+  const openPreviewLesson = (lesson: Lesson | null) => {
+    if (!lesson?.preview || !lesson.gumletPlaybackUrl) {
+      return;
+    }
+    setPreviewLessonId(lesson.id);
+  };
 
   if (loading) {
     return <div className="min-h-screen bg-[#f5f7f8] dark:bg-[#101922]" />;
@@ -183,7 +194,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
             Quay lại
           </button>
           <button
-            onClick={() => onNavigate(isAdmin ? 'admin-dashboard' : isAuthenticated ? 'student-dashboard' : 'landing')}
+            onClick={() => onNavigate(isAdmin ? 'admin-dashboard' : isInstructor ? 'admin-courses' : isAuthenticated ? 'student-dashboard' : 'landing')}
             className="text-sm font-semibold text-primary transition-colors hover:text-primary-hover"
           >
             Edu Platform
@@ -255,6 +266,15 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
                     >
                       {primaryActionLabel}
                     </button>
+                    {!isEnrolled && canPreview ? (
+                      <button
+                        onClick={() => openPreviewLesson(previewLesson)}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-3.5 text-sm font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20"
+                      >
+                        <PlayCircle size={18} />
+                        Xem bài học thử
+                      </button>
+                    ) : null}
                     <button
                       onClick={() => document.getElementById('lesson-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                       className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
@@ -315,6 +335,15 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
                     Học ngay
                   </button>
                 ) : null}
+                {!isEnrolled && canPreview ? (
+                  <button
+                    onClick={() => openPreviewLesson(previewLesson)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-500 hover:text-white dark:text-emerald-300"
+                  >
+                    <PlayCircle size={18} />
+                    Xem thử bài đầu
+                  </button>
+                ) : null}
               </div>
 
               <div className="mt-6 space-y-3">
@@ -342,6 +371,15 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
                           </span>
                           {lesson.preview ? (
                             <span className="rounded-full bg-emerald-500/10 px-2 py-1 font-semibold text-emerald-600 dark:text-emerald-400">Xem thử</span>
+                          ) : null}
+                          {lesson.preview && lesson.gumletPlaybackUrl ? (
+                            <button
+                              onClick={() => openPreviewLesson(lesson)}
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-dark-card dark:text-emerald-300"
+                            >
+                              <PlayCircle size={12} />
+                              Mở preview
+                            </button>
                           ) : null}
                         </div>
                       </div>
@@ -383,6 +421,35 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
           </div>
         </section>
       </main>
+
+      {activePreviewLesson?.gumletPlaybackUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <button onClick={() => setPreviewLessonId(null)} className="absolute inset-0" aria-label="Đóng preview" />
+          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 text-white">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-300">Preview Lesson</p>
+                <h3 className="mt-1 text-lg font-bold">{activePreviewLesson.title}</h3>
+              </div>
+              <button
+                onClick={() => setPreviewLessonId(null)}
+                className="rounded-full border border-white/10 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="relative aspect-video bg-black">
+              <iframe
+                className="absolute inset-0 h-full w-full"
+                src={activePreviewLesson.gumletPlaybackUrl}
+                title={activePreviewLesson.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   LayoutDashboard,
   BookOpen,
@@ -12,7 +12,7 @@ import {
 import { clearAuthSession } from '../api';
 
 interface SidebarProps {
-  role: 'student' | 'admin';
+  role: 'student' | 'admin' | 'instructor';
   activePage: string;
   onNavigate: (page: string) => void;
 }
@@ -33,7 +33,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, activePage, onNavigate }) => {
     { id: 'revenue', label: 'Thanh toán', icon: CreditCard, target: 'admin-revenue' },
   ];
 
-  const menu = role === 'admin' ? adminMenu : studentMenu;
+  const instructorMenu = [
+    { id: 'courses_admin', label: 'Khóa học của tôi', icon: BookOpen, target: 'admin-courses' },
+  ];
+
+  const menu = role === 'admin' ? adminMenu : role === 'instructor' ? instructorMenu : studentMenu;
 
   return (
     <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-dark-border dark:bg-dark-sidebar md:flex">
@@ -42,12 +46,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, activePage, onNavigate }) => {
           <GraduationCap size={20} />
         </div>
         <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-          {role === 'admin' ? 'AdminPanel' : 'EduSmart'}
+          {role === 'admin' ? 'AdminPanel' : role === 'instructor' ? 'Instructor Studio' : 'EduSmart'}
         </span>
       </div>
 
       <div className="flex-1 space-y-1 overflow-y-auto px-4 py-2">
-        {role === 'admin' && (
+        {role !== 'student' && (
           <p className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Điều hướng</p>
         )}
 
@@ -66,7 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, activePage, onNavigate }) => {
           </button>
         ))}
 
-        {role === 'admin' && (
+        {role !== 'student' && (
           <>
             <p className="mt-6 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Hệ thống</p>
             <button
@@ -99,8 +103,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role, activePage, onNavigate }) => {
               style={{ backgroundImage: 'url(https://picsum.photos/seed/admin/100/100)' }}
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-900 dark:text-white">Admin System</p>
-              <p className="truncate text-xs text-slate-500">admin@edu.vn</p>
+              <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{role === 'admin' ? 'Admin System' : 'Instructor Account'}</p>
+              <p className="truncate text-xs text-slate-500">{role === 'admin' ? 'admin@edu.vn' : 'instructor@edu.vn'}</p>
             </div>
             <button
               onClick={() => {
