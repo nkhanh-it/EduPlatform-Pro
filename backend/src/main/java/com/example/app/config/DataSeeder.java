@@ -162,13 +162,16 @@ public class DataSeeder {
                     tx.setAmount(course.getPrice());
                     tx.setStatus(i % 8 == 0 ? PaymentStatus.FAILED : PaymentStatus.SUCCESS);
                     tx.setMethod(i % 3 == 0 ? PaymentMethod.MOMO : i % 3 == 1 ? PaymentMethod.QR : PaymentMethod.CARD);
+                    tx.setProvider("VNPAY");
                     tx.setExternalRef("TXN-" + (1000 + i));
+                    tx.setGatewayResponseCode(tx.getStatus() == PaymentStatus.SUCCESS ? "00" : null);
 
                     Instant createdAt = LocalDate.now()
                         .minusDays(random.nextInt(60))
                         .atStartOfDay(ZoneId.systemDefault())
                         .toInstant();
                     tx.setCreatedAt(createdAt);
+                    tx.setPaidAt(tx.getStatus() == PaymentStatus.SUCCESS ? createdAt : null);
                     transactionRepository.save(tx);
                 }
             }
