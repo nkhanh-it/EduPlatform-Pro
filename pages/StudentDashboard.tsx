@@ -1,90 +1,172 @@
-import React from 'react';
-import { 
-  Bell, 
-  Search, 
-  Book, 
-  Clock, 
-  Award, 
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Bell,
+  Search,
+  Book,
+  Clock,
+  Award,
   PlayCircle,
   ArrowRight,
   ArrowUp,
   Calendar,
-  Star
+  Star,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
-import { COURSES } from '../constants';
+import { Course, Enrollment, User } from '../types';
+import { getCourses, getMe, getMyEnrollments, setSelectedCourseId } from '../api';
+import { showInfoToast } from '../components/feedback/ToastProvider';
 
 interface StudentDashboardProps {
   onNavigate: (page: string) => void;
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }) => {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [search, setSearch] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const me = await getMe();
+        setUser(me as User);
+      } catch {
+        setUser(null);
+      }
+
+      try {
+        const courseData = await getCourses('All', '');
+        setCourses(courseData as Course[]);
+      } catch {
+        setCourses([]);
+      }
+
+      try {
+        const enrollData = await getMyEnrollments();
+        setEnrollments(enrollData as Enrollment[]);
+      } catch {
+        setEnrollments([]);
+      }
+    };
+
+    load();
+  }, []);
+
+  const currentEnrollment = enrollments.find((item) => item.progressPercent < 100) || enrollments[0];
+  const continueCourse = currentEnrollment?.course as Course | undefined;
+
+  const filteredRecommendations = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) {
+      return courses.slice(0, 3);
+    }
+
+    return courses
+      .filter((course) =>
+        course.title.toLowerCase().includes(keyword) ||
+        course.instructor.toLowerCase().includes(keyword) ||
+        course.category.toLowerCase().includes(keyword),
+      )
+      .slice(0, 3);
+  }, [courses, search]);
+
   return (
-    <div className="flex h-screen bg-[#f5f7f8] dark:bg-[#101922] text-slate-900 dark:text-white overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#f5f7f8] text-slate-900 dark:bg-[#101922] dark:text-white">
       <Sidebar role="student" activePage="student-dashboard" onNavigate={onNavigate} />
 
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden">
-        {/* Header */}
-        <header className="h-16 flex-shrink-0 border-b border-gray-200 dark:border-dark-border bg-white/80 dark:bg-dark-bg/90 backdrop-blur-md px-6 md:px-10 flex items-center justify-between sticky top-0 z-20">
-          <div className="hidden md:flex items-center bg-gray-100 dark:bg-dark-border rounded-full px-4 py-2 w-64">
+      <div className="relative flex h-full flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-6 backdrop-blur-md dark:border-dark-border dark:bg-dark-bg/90 md:px-10">
+          <div className="hidden w-64 items-center rounded-full bg-gray-100 px-4 py-2 dark:bg-dark-border md:flex">
             <Search className="text-slate-400" size={20} />
-            <input 
+            <input
               type="text"
-              className="bg-transparent border-none focus:ring-0 text-sm w-full ml-2 placeholder-slate-400 text-slate-900 dark:text-white outline-none"
-              placeholder="Tìm kiếm..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="ml-2 w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder-slate-400 focus:ring-0 dark:text-white"
+              placeholder="Tìm khóa học..."
             />
           </div>
-          
-          <div className="flex items-center gap-4 ml-auto">
-            <button className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
+
+          <div className="ml-auto flex items-center gap-4">
+            <button
+              onClick={() => {
+                setMessage('Không có thông báo mới.');
+                showInfoToast('Không có thông báo mới.');
+              }}
+              className="relative rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-dark-border"
+            >
               <Bell size={20} className="text-slate-600 dark:text-slate-300" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-dark-bg"></span>
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500 dark:border-dark-bg" />
             </button>
-            <div className="h-8 w-[1px] bg-gray-200 dark:bg-dark-border mx-2 hidden sm:block"></div>
+            <div className="mx-2 hidden h-8 w-[1px] bg-gray-200 dark:bg-dark-border sm:block" />
             <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold leading-none">Nguyễn Văn A</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Học viên</p>
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-bold leading-none">{user?.displayName || user?.fullName || 'Học viên'}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Học viên</p>
               </div>
-              <div 
-                className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white dark:border-dark-border shadow-sm"
-                style={{ backgroundImage: 'url(https://picsum.photos/seed/user1/100/100)' }}
+              <div
+                className="h-10 w-10 rounded-full border-2 border-white bg-cover bg-center shadow-sm dark:border-dark-border"
+                style={{ backgroundImage: `url(${user?.avatarUrl || 'https://picsum.photos/seed/user1/100/100'})` }}
               />
             </div>
           </div>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 scroll-smooth">
-          <div className="max-w-6xl mx-auto space-y-8 pb-10">
-            {/* Welcome */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="flex-1 overflow-y-auto p-6 md:p-10">
+          <div className="mx-auto max-w-6xl space-y-8 pb-10">
+            <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold mb-2">Chào mừng trở lại, Nguyễn Văn A! 👋</h2>
-                <p className="text-slate-500 dark:text-slate-400">Bạn có 2 bài tập cần hoàn thành hôm nay.</p>
+                <h2 className="mb-2 text-2xl font-bold md:text-3xl">
+                  Chào mừng trở lại, {user?.displayName || user?.fullName || 'học viên'}!
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Bạn có {enrollments.filter((item) => item.progressPercent < 100).length} khóa học đang theo dõi.
+                </p>
               </div>
-              <div className="flex items-center text-sm font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-dark-card px-4 py-2 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm">
+              <div className="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-slate-500 shadow-sm dark:border-dark-border dark:bg-dark-card dark:text-slate-400">
                 <Calendar className="mr-2 text-primary" size={20} />
-                <span>24 Tháng 10, 2023</span>
+                <span>{new Date().toLocaleDateString('vi-VN')}</span>
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {message && <p className="text-sm text-slate-500">{message}</p>}
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {[
-                { title: 'Khóa học đã đăng ký', value: '12', change: '+2', icon: Book, color: 'text-blue-500' },
-                { title: 'Khóa học đang học', value: '2', icon: Clock, color: 'text-yellow-500' },
-                { title: 'Chứng chỉ đã đạt', value: '5', icon: Award, color: 'text-green-500' },
+                {
+                  title: 'Khóa học đã đăng ký',
+                  value: enrollments.length,
+                  change: `+${Math.min(enrollments.length, 2)}`,
+                  icon: Book,
+                  color: 'text-blue-500',
+                },
+                {
+                  title: 'Khóa học đang học',
+                  value: enrollments.filter((e) => e.progressPercent > 0 && e.progressPercent < 100).length,
+                  icon: Clock,
+                  color: 'text-yellow-500',
+                },
+                {
+                  title: 'Chứng chỉ đã đạt',
+                  value: enrollments.filter((e) => e.progressPercent === 100).length,
+                  icon: Award,
+                  color: 'text-green-500',
+                },
               ].map((stat, i) => (
-                <div key={i} className="bg-white dark:bg-dark-card p-6 rounded-xl border border-gray-200 dark:border-dark-border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                  <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <div
+                  key={i}
+                  className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-dark-border dark:bg-dark-card"
+                >
+                  <div className="absolute right-0 top-0 p-4 opacity-10 transition-opacity group-hover:opacity-20">
                     <stat.icon size={64} className={stat.color} />
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">{stat.title}</p>
+                  <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">{stat.title}</p>
                   <div className="flex items-baseline gap-2">
                     <span className="text-3xl font-bold">{stat.value}</span>
                     {stat.change && (
-                      <span className="text-xs text-green-500 font-medium flex items-center">
+                      <span className="flex items-center text-xs font-medium text-green-500">
                         <ArrowUp size={14} /> {stat.change}
                       </span>
                     )}
@@ -93,80 +175,110 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }) => {
               ))}
             </div>
 
-            {/* Continue Learning */}
             <section>
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-xl font-bold">Tiếp tục học</h3>
-                <button onClick={() => onNavigate('courses')} className="text-primary text-sm font-medium hover:underline">Xem tất cả</button>
+                <button onClick={() => onNavigate('courses')} className="text-sm font-medium text-primary hover:underline">
+                  Xem tất cả
+                </button>
               </div>
-              <div className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border p-5 shadow-sm flex flex-col md:flex-row gap-6 items-center">
-                <div className="w-full md:w-64 h-40 flex-shrink-0 rounded-lg bg-cover bg-center overflow-hidden relative group" style={{ backgroundImage: `url(${COURSES[0].thumbnail})` }}>
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+
+              <div className="flex flex-col items-center gap-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-border dark:bg-dark-card md:flex-row">
+                <div
+                  className="group relative h-40 w-full flex-shrink-0 overflow-hidden rounded-lg bg-cover bg-center md:w-64"
+                  style={{ backgroundImage: `url(${continueCourse?.thumbnail || courses[0]?.thumbnail || 'https://picsum.photos/seed/course/800/450'})` }}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                     <PlayCircle className="text-white" size={48} />
                   </div>
                 </div>
-                <div className="flex-1 w-full">
-                  <div className="flex items-start justify-between mb-2">
+
+                <div className="w-full flex-1">
+                  <div className="mb-2 flex items-start justify-between">
                     <div>
-                      <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 mb-2">Frontend Development</span>
-                      <h4 className="text-xl font-bold mb-1">ReactJS Advanced Masterclass</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Chương 4: Quản lý State với Redux Toolkit</p>
+                      <span className="mb-2 inline-block rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        {continueCourse?.category || 'Tổng hợp'}
+                      </span>
+                      <h4 className="mb-1 text-xl font-bold">
+                        {continueCourse?.title || courses[0]?.title || 'Khóa học đang cập nhật'}
+                      </h4>
+                      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+                        Giảng viên: {continueCourse?.instructor || courses[0]?.instructor || 'Đang cập nhật'}
+                      </p>
                     </div>
                   </div>
+
                   <div className="mb-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-600 dark:text-slate-300 font-medium">Tiến độ</span>
-                      <span className="font-bold">45%</span>
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">Tiến độ</span>
+                      <span className="font-bold">{currentEnrollment?.progressPercent ?? 0}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                      <div className="bg-primary h-2.5 rounded-full relative" style={{ width: '45%' }}>
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow"></div>
+                    <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                      <div className="relative h-2.5 rounded-full bg-primary" style={{ width: `${currentEnrollment?.progressPercent ?? 0}%` }}>
+                        <div className="absolute right-0 top-1/2 h-3 w-3 translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-white shadow" />
                       </div>
                     </div>
                   </div>
+
                   <div className="flex gap-3">
-                    <button 
-                      onClick={() => onNavigate('course-player')}
-                      className="bg-primary hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center shadow-lg shadow-blue-500/20"
+                    <button
+                      onClick={() => {
+                        if (continueCourse?.id) {
+                          setSelectedCourseId(continueCourse.id);
+                        }
+                        onNavigate('course-player');
+                      }}
+                      className="flex items-center rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600"
                     >
                       Tiếp tục học ngay
                       <ArrowRight size={18} className="ml-2" />
                     </button>
-                    <button onClick={() => onNavigate('course-player')} className="bg-white dark:bg-dark-card border border-gray-200 dark:border-gray-600 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-dark-border px-4 py-2.5 rounded-lg font-medium text-sm transition-colors">
-                      Chi tiết khóa học
+                    <button
+                      onClick={() => onNavigate('student-courses')}
+                      className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-dark-card dark:text-slate-300 dark:hover:bg-dark-border"
+                    >
+                      Khóa học của tôi
                     </button>
                   </div>
                 </div>
               </div>
             </section>
 
-             {/* Recommendations */}
-             <section>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold">Gợi ý cho bạn</h3>
+            <section>
+              <div className="mb-6 flex items-center justify-between">
+                <h3 className="text-xl font-bold">Gợi ý dành cho bạn</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {COURSES.slice(1, 4).map(course => (
-                  <div key={course.id} onClick={() => onNavigate('checkout')} className="group bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                    <div className="h-44 bg-cover bg-center relative" style={{ backgroundImage: `url(${course.thumbnail})` }}>
-                       <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
-                          <Star size={12} fill="currentColor" className="text-yellow-400" /> {course.rating}
-                       </div>
+
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredRecommendations.map((course) => (
+                  <div
+                    key={course.id}
+                    onClick={() => {
+                      setSelectedCourseId(course.id);
+                      onNavigate('course-detail');
+                    }}
+                    className="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-dark-border dark:bg-dark-card"
+                  >
+                    <div className="relative h-44 bg-cover bg-center" style={{ backgroundImage: `url(${course.thumbnail})` }}>
+                      <div className="absolute right-3 top-3 flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-xs font-bold text-white backdrop-blur-sm">
+                        <Star size={12} fill="currentColor" className="text-yellow-400" /> {course.rating}
+                      </div>
                     </div>
                     <div className="p-5">
-                       <div className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">{course.category}</div>
-                       <h4 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors">{course.title}</h4>
-                       <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-4 gap-4">
-                          <span className="flex items-center gap-1"><Clock size={16} /> {course.totalLessons} bài</span>
-                          <span className="flex items-center gap-1"><Book size={16} /> {course.reviews} học viên</span>
-                       </div>
-                       <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-dark-border">
-                          <div className="flex items-center gap-2">
-                             <div className="w-6 h-6 rounded-full bg-gray-300 bg-cover" style={{ backgroundImage: 'url(https://picsum.photos/seed/inst/50/50)' }} />
-                             <span className="text-xs text-slate-600 dark:text-slate-400">{course.instructor}</span>
-                          </div>
-                          <span className="font-bold text-primary">{course.price.toLocaleString('vi-VN')}đ</span>
-                       </div>
+                      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-primary">{course.category}</div>
+                      <h4 className="mb-2 line-clamp-2 text-lg font-bold transition-colors group-hover:text-primary">{course.title}</h4>
+                      <div className="mb-4 flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Clock size={16} /> {course.totalLessons || 0} bài
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Book size={16} /> {course.reviews} học viên
+                        </span>
+                      </div>
+                      <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-border">
+                        <span className="text-xs text-slate-600 dark:text-slate-400">{course.instructor}</span>
+                        <span className="font-bold text-primary">{Number(course.price).toLocaleString('vi-VN')}đ</span>
+                      </div>
                     </div>
                   </div>
                 ))}
