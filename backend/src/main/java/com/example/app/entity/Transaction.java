@@ -48,7 +48,14 @@ public class Transaction {
     @Column(nullable = false)
     private PaymentMethod method = PaymentMethod.CARD;
 
+    @Column(nullable = false)
+    private String provider = "VNPAY";
+
     private String externalRef;
+
+    private String gatewayResponseCode;
+
+    private Instant paidAt;
 
     @Column(nullable = false)
     private Instant createdAt;
@@ -120,6 +127,30 @@ public class Transaction {
 
     public void setExternalRef(String externalRef) {
         this.externalRef = externalRef;
+    }
+
+    public String getGatewayResponseCode() {
+        return gatewayResponseCode;
+    }
+
+    public void setGatewayResponseCode(String gatewayResponseCode) {
+        this.gatewayResponseCode = gatewayResponseCode;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
+
+    public Instant getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(Instant paidAt) {
+        this.paidAt = paidAt;
     }
 
     public Instant getCreatedAt() {
