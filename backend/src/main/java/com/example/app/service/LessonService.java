@@ -5,6 +5,7 @@ import com.example.app.dto.LessonDto;
 import com.example.app.dto.LessonUpdateRequest;
 import com.example.app.entity.Course;
 import com.example.app.entity.Lesson;
+import com.example.app.entity.MediaFile;
 import com.example.app.entity.EnrollmentStatus;
 import com.example.app.entity.Role;
 import com.example.app.entity.User;
@@ -12,6 +13,7 @@ import com.example.app.exception.BadRequestException;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.EnrollmentRepository;
 import com.example.app.repository.LessonRepository;
+import com.example.app.repository.MediaFileRepository;
 import com.example.app.repository.UserRepository;
 import com.example.app.security.SecurityUtils;
 import org.springframework.stereotype.Service;
@@ -29,21 +31,31 @@ public class LessonService {
     private final CourseService courseService;
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final MediaFileRepository mediaFileRepository;
+    private final MediaService mediaService;
 
     public LessonService(LessonRepository lessonRepository,
                          CourseService courseService,
                          UserRepository userRepository,
-                         EnrollmentRepository enrollmentRepository) {
+                         EnrollmentRepository enrollmentRepository,
+                         MediaFileRepository mediaFileRepository,
+                         MediaService mediaService) {
         this.lessonRepository = lessonRepository;
         this.courseService = courseService;
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.mediaFileRepository = mediaFileRepository;
+        this.mediaService = mediaService;
     }
 
     public List<LessonDto> listByCourse(UUID courseId) {
-        boolean canAccessVideo = canAccessVideo(courseId);
-        return lessonRepository.findByCourseIdOrderByOrderIndexAsc(courseId).stream()
-            .map(lesson -> LessonDto.fromEntity(lesson, canAccessVideo || lesson.isPreview()))
+        Course course = courseService.getCourseEntity(courseId);
+        boolean canAccessVideo = canAccessVideo(course.getId());
+        return lessonRepository.findByCourseIdOrderByOrderIndexAsc(course.getId()).stream()
+            .map(lesson -> LessonDto.fromEntity(
+                lesson,
+                buildPlaybackUrl(lesson, canAccessVideo || lesson.isPreview())
+            ))
             .collect(Collectors.toList());
     }
 
@@ -54,24 +66,27 @@ public class LessonService {
 
     public LessonDto createLesson(UUID courseId, LessonCreateRequest request) {
         Course course = courseService.getCourseEntity(courseId);
+        validateUniqueOrderIndex(course.getId(), request.getOrderIndex(), null);
         Lesson lesson = new Lesson();
         lesson.setCourse(course);
-        lesson.setTitle(request.getTitle().trim());
+        lesson.setTitle(normalizeTitle(request.getTitle()));
         lesson.setOrderIndex(request.getOrderIndex());
         lesson.setDurationSeconds(request.getDurationSeconds());
         lesson.setPreview(request.isPreview());
-        applyPlaybackUrl(lesson, request.getGumletPlaybackUrl());
+        lesson.setMediaFile(resolveMediaFile(request.getMediaFileId()));
         Lesson saved = lessonRepository.save(lesson);
         syncCourseLessonCount(course);
-        return LessonDto.fromEntity(saved);
+        return LessonDto.fromEntity(saved, buildPlaybackUrl(saved, true));
     }
 
     public LessonDto updateLesson(UUID lessonId, LessonUpdateRequest request) {
         Lesson lesson = getLesson(lessonId);
+        MediaFile previousMediaFile = lesson.getMediaFile();
         if (request.getTitle() != null) {
-            lesson.setTitle(request.getTitle().trim());
+            lesson.setTitle(normalizeTitle(request.getTitle()));
         }
         if (request.getOrderIndex() != null) {
+            validateUniqueOrderIndex(lesson.getCourse().getId(), request.getOrderIndex(), lesson.getId());
             lesson.setOrderIndex(request.getOrderIndex());
         }
         if (request.getDurationSeconds() != null) {
@@ -80,33 +95,49 @@ public class LessonService {
         if (request.getPreview() != null) {
             lesson.setPreview(request.getPreview());
         }
-        if (request.getGumletPlaybackUrl() != null) {
-            applyPlaybackUrl(lesson, request.getGumletPlaybackUrl());
+        if (Boolean.TRUE.equals(request.getClearMedia())) {
+            lesson.setMediaFile(null);
+        } else if (request.getMediaFileId() != null) {
+            lesson.setMediaFile(resolveMediaFile(request.getMediaFileId()));
         }
         Lesson saved = lessonRepository.save(lesson);
+        cleanupUnusedMedia(previousMediaFile, saved.getMediaFile());
         syncCourseLessonCount(lesson.getCourse());
-        return LessonDto.fromEntity(saved);
+        return LessonDto.fromEntity(saved, buildPlaybackUrl(saved, true));
     }
 
     public void deleteLesson(UUID lessonId) {
         Lesson lesson = getLesson(lessonId);
         Course course = lesson.getCourse();
+        MediaFile previousMediaFile = lesson.getMediaFile();
         lessonRepository.delete(lesson);
+        cleanupUnusedMedia(previousMediaFile, null);
         syncCourseLessonCount(course);
     }
 
-    private void applyPlaybackUrl(Lesson lesson, String rawPlaybackUrl) {
-        String normalized = normalize(rawPlaybackUrl);
-        if (normalized == null) {
-            lesson.setGumletPlaybackUrl(null);
-            return;
+    private MediaFile resolveMediaFile(UUID mediaFileId) {
+        if (mediaFileId == null) {
+            return null;
         }
+        return mediaFileRepository.findById(mediaFileId)
+            .orElseThrow(() -> new BadRequestException("Media file does not exist"));
+    }
 
-        if (!looksLikeUrl(normalized)) {
-            throw new BadRequestException("Playback link is invalid");
+    private void validateUniqueOrderIndex(UUID courseId, int orderIndex, UUID lessonId) {
+        boolean exists = lessonId == null
+            ? lessonRepository.existsByCourseIdAndOrderIndex(courseId, orderIndex)
+            : lessonRepository.existsByCourseIdAndOrderIndexAndIdNot(courseId, orderIndex, lessonId);
+        if (exists) {
+            throw new BadRequestException("Lesson order already exists in this course");
         }
+    }
 
-        lesson.setGumletPlaybackUrl(normalized);
+    private String normalizeTitle(String title) {
+        String normalized = title == null ? null : title.trim();
+        if (normalized == null || normalized.isBlank()) {
+            throw new BadRequestException("Lesson title is required");
+        }
+        return normalized;
     }
 
     private void syncCourseLessonCount(Course course) {
@@ -114,16 +145,29 @@ public class LessonService {
         courseService.saveCourse(course);
     }
 
-    private String normalize(String value) {
-        if (value == null) {
-            return null;
+    private void cleanupUnusedMedia(MediaFile previousMediaFile, MediaFile currentMediaFile) {
+        if (previousMediaFile == null) {
+            return;
         }
-        String normalized = value.trim();
-        return normalized.isEmpty() ? null : normalized;
+        if (currentMediaFile != null && previousMediaFile.getId().equals(currentMediaFile.getId())) {
+            return;
+        }
+        if (lessonRepository.countByMediaFileId(previousMediaFile.getId()) > 0) {
+            return;
+        }
+        mediaService.deleteMediaFileAssets(previousMediaFile.getId());
     }
 
-    private boolean looksLikeUrl(String value) {
-        return value.startsWith("http://") || value.startsWith("https://");
+    private String buildPlaybackUrl(Lesson lesson, boolean includeVideo) {
+        if (!includeVideo || lesson.getMediaFile() == null) {
+            return null;
+        }
+        return mediaService.createPlaybackUrl(
+            lesson.getMediaFile(),
+            lesson.getId(),
+            lesson.isPreview(),
+            lesson.isPreview() ? null : SecurityUtils.getCurrentUserEmail()
+        );
     }
 
     private boolean canAccessVideo(UUID courseId) {
@@ -137,7 +181,7 @@ public class LessonService {
             return false;
         }
 
-        if (user.getRole() == Role.ADMIN) {
+        if (user.getRole() == Role.ADMIN || user.getRole() == Role.INSTRUCTOR) {
             return true;
         }
 

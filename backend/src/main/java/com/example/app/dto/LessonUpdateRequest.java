@@ -3,6 +3,8 @@ package com.example.app.dto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
+import java.util.UUID;
+
 public class LessonUpdateRequest {
 
     @Size(min = 2, max = 200)
@@ -16,7 +18,8 @@ public class LessonUpdateRequest {
 
     private Boolean preview;
 
-    private String gumletPlaybackUrl;
+    private UUID mediaFileId;
+    private Boolean clearMedia;
 
     public String getTitle() {
         return title;
@@ -50,11 +53,19 @@ public class LessonUpdateRequest {
         this.preview = preview;
     }
 
-    public String getGumletPlaybackUrl() {
-        return gumletPlaybackUrl;
+    public UUID getMediaFileId() {
+        return mediaFileId;
     }
 
-    public void setGumletPlaybackUrl(String gumletPlaybackUrl) {
-        this.gumletPlaybackUrl = gumletPlaybackUrl;
+    public void setMediaFileId(UUID mediaFileId) {
+        this.mediaFileId = mediaFileId;
+    }
+
+    public Boolean getClearMedia() {
+        return clearMedia;
+    }
+
+    public void setClearMedia(Boolean clearMedia) {
+        this.clearMedia = clearMedia;
     }
 }

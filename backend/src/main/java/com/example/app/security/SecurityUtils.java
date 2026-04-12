@@ -14,4 +14,12 @@ public final class SecurityUtils {
         }
         return auth.getName();
     }
+
+    public static String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return null;
+        }
+        return auth.getName();
+    }
 }

@@ -11,20 +11,28 @@ public class LessonDto {
     private int orderIndex;
     private int durationSeconds;
     private boolean preview;
-    private String gumletPlaybackUrl;
+    private UUID mediaFileId;
+    private String mediaFileName;
+    private boolean mediaProcessing;
+    private boolean hlsReady;
+    private String videoPlaybackUrl;
 
     public static LessonDto fromEntity(Lesson lesson) {
-        return fromEntity(lesson, true);
+        return fromEntity(lesson, null);
     }
 
-    public static LessonDto fromEntity(Lesson lesson, boolean includeVideo) {
+    public static LessonDto fromEntity(Lesson lesson, String playbackUrl) {
         LessonDto dto = new LessonDto();
         dto.id = lesson.getId();
         dto.title = lesson.getTitle();
         dto.orderIndex = lesson.getOrderIndex();
         dto.durationSeconds = lesson.getDurationSeconds();
         dto.preview = lesson.isPreview();
-        dto.gumletPlaybackUrl = includeVideo ? lesson.getGumletPlaybackUrl() : null;
+        dto.mediaFileId = lesson.getMediaFile() != null ? lesson.getMediaFile().getId() : null;
+        dto.mediaFileName = lesson.getMediaFile() != null ? lesson.getMediaFile().getOriginalFileName() : null;
+        dto.mediaProcessing = lesson.getMediaFile() != null && lesson.getMediaFile().isHlsProcessing();
+        dto.hlsReady = lesson.getMediaFile() != null && lesson.getMediaFile().isHlsReady();
+        dto.videoPlaybackUrl = playbackUrl;
         return dto;
     }
 
@@ -48,7 +56,23 @@ public class LessonDto {
         return preview;
     }
 
-    public String getGumletPlaybackUrl() {
-        return gumletPlaybackUrl;
+    public UUID getMediaFileId() {
+        return mediaFileId;
+    }
+
+    public String getMediaFileName() {
+        return mediaFileName;
+    }
+
+    public boolean isMediaProcessing() {
+        return mediaProcessing;
+    }
+
+    public boolean isHlsReady() {
+        return hlsReady;
+    }
+
+    public String getVideoPlaybackUrl() {
+        return videoPlaybackUrl;
     }
 }

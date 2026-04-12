@@ -38,7 +38,9 @@ public class Lesson {
 
     private boolean preview;
 
-    private String gumletPlaybackUrl;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "media_file_id")
+    private MediaFile mediaFile;
 
     @Column(nullable = false)
     private Instant createdAt;
@@ -106,12 +108,12 @@ public class Lesson {
         this.preview = preview;
     }
 
-    public String getGumletPlaybackUrl() {
-        return gumletPlaybackUrl;
+    public MediaFile getMediaFile() {
+        return mediaFile;
     }
 
-    public void setGumletPlaybackUrl(String gumletPlaybackUrl) {
-        this.gumletPlaybackUrl = gumletPlaybackUrl;
+    public void setMediaFile(MediaFile mediaFile) {
+        this.mediaFile = mediaFile;
     }
 
     public Instant getCreatedAt() {

@@ -34,27 +34,27 @@ public class LessonController {
         return ResponseEntity.ok(lessonService.listByCourse(courseId));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','INSTRUCTOR')")
     @GetMapping("/admin/courses/{courseId}/lessons")
     public ResponseEntity<List<LessonDto>> listAdminLessons(@PathVariable UUID courseId) {
         return ResponseEntity.ok(lessonService.listByCourse(courseId));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','INSTRUCTOR')")
     @PostMapping("/courses/{courseId}/lessons")
     public ResponseEntity<LessonDto> createLesson(@PathVariable UUID courseId,
                                                   @Valid @RequestBody LessonCreateRequest request) {
         return ResponseEntity.ok(lessonService.createLesson(courseId, request));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','INSTRUCTOR')")
     @PutMapping("/lessons/{lessonId}")
     public ResponseEntity<LessonDto> updateLesson(@PathVariable UUID lessonId,
                                                   @Valid @RequestBody LessonUpdateRequest request) {
         return ResponseEntity.ok(lessonService.updateLesson(lessonId, request));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','INSTRUCTOR')")
     @DeleteMapping("/lessons/{lessonId}")
     public ResponseEntity<Void> deleteLesson(@PathVariable UUID lessonId) {
         lessonService.deleteLesson(lessonId);
