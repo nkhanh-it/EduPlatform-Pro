@@ -1,9 +1,9 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { Search, Bell, Plus, Filter, MoreVertical, Edit, Trash2, Star, BookOpen, Users, Video, Link2 } from 'lucide-react';
+import { Search, Bell, Plus, Filter, MoreVertical, Edit, Trash2, Star, BookOpen, Users, Video, UploadCloud } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ControlSelect from '../components/filters/ControlSelect';
 import { Course, Lesson } from '../types';
-import { adminCreateCourse, adminCreateLesson, adminDeleteCourse, adminDeleteLesson, adminGetCourseLessons, adminGetCourses, adminUpdateCourse, adminUpdateLesson } from '../api';
+import { adminCreateCourse, adminCreateLesson, adminDeleteCourse, adminDeleteLesson, adminGetCourseLessons, adminGetCourses, adminUpdateCourse, adminUpdateLesson, completeMediaUpload, createMediaUploadSession, uploadMediaChunk } from '../api';
 import { showAlert, showConfirm, showPrompt } from '../components/dialogs/DialogProvider';
 import { showErrorToast, showInfoToast, showSuccessToast } from '../components/feedback/ToastProvider';
 
@@ -18,8 +18,35 @@ const formatLessonDuration = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
+const MEDIA_CHUNK_SIZE = 5 * 1024 * 1024;
+
 const getShortId = (value?: string) => (value ? value.replace(/-/g, '').slice(0, 8).toUpperCase() : 'N/A');
 const getCourseLabel = (course?: Course | null) => (course?.courseCode || getShortId(course?.id));
+
+const detectVideoDuration = (file: File) =>
+  new Promise<number>((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(file);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.removeAttribute('src');
+      video.load();
+    };
+
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? Math.max(0, Math.round(video.duration)) : 0;
+      cleanup();
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Không thể đọc thời lượng video.'));
+    };
+
+    video.src = objectUrl;
+  });
 
 const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -53,8 +80,10 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
     orderIndex: '1',
     durationSeconds: '600',
     preview: false,
-    gumletPlaybackUrl: '',
+    mediaFileId: '',
   });
+  const [lessonMediaFile, setLessonMediaFile] = useState<File | null>(null);
+  const [lessonUploadProgress, setLessonUploadProgress] = useState(0);
   const [courseFormErrors, setCourseFormErrors] = useState<Record<string, string>>({});
   const [lessonFormErrors, setLessonFormErrors] = useState<Record<string, string>>({});
   const [courseFormSubmitting, setCourseFormSubmitting] = useState(false);
@@ -193,10 +222,12 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
     setLessonFormValues({
       title: '',
       orderIndex: String(courseLessons.length + 1),
-      durationSeconds: '600',
+      durationSeconds: '',
       preview: false,
-      gumletPlaybackUrl: '',
+      mediaFileId: '',
     });
+    setLessonMediaFile(null);
+    setLessonUploadProgress(0);
     setLessonFormErrors({});
     setIsLessonModalOpen(true);
   };
@@ -228,8 +259,10 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
       orderIndex: String(lesson.orderIndex || 1),
       durationSeconds: String(lesson.durationSeconds ?? 0),
       preview: Boolean(lesson.preview),
-      gumletPlaybackUrl: lesson.gumletPlaybackUrl || '',
+      mediaFileId: lesson.mediaFileId || '',
     });
+    setLessonMediaFile(null);
+    setLessonUploadProgress(0);
     setLessonFormErrors({});
     setIsLessonModalOpen(true);
   };
@@ -274,18 +307,33 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
     if (!Number.isInteger(orderIndex) || orderIndex < 1) nextErrors.orderIndex = 'Thứ tự bài học phải từ 1 trở lên.';
     const durationSeconds = Number(lessonFormValues.durationSeconds);
     if (!Number.isInteger(durationSeconds) || durationSeconds < 0) nextErrors.durationSeconds = 'Thời lượng phải là số nguyên không âm.';
-    if (lessonFormValues.gumletPlaybackUrl.trim()) {
-      try {
-        const url = new URL(lessonFormValues.gumletPlaybackUrl.trim());
-        if (!['http:', 'https:'].includes(url.protocol)) {
-          nextErrors.gumletPlaybackUrl = 'Link video không hợp lệ.';
-        }
-      } catch {
-        nextErrors.gumletPlaybackUrl = 'Link video không hợp lệ.';
-      }
-    }
     setLessonFormErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleLessonMediaFileChange = async (file: File | null) => {
+    setLessonMediaFile(file);
+    if (!file) {
+      if (lessonFormMode === 'create') {
+        setLessonFormValues((prev) => ({ ...prev, durationSeconds: '' }));
+      }
+      return;
+    }
+
+    try {
+      const durationSeconds = await detectVideoDuration(file);
+      setLessonFormValues((prev) => ({
+        ...prev,
+        durationSeconds: String(durationSeconds),
+      }));
+      setLessonFormErrors((prev) => {
+        const next = { ...prev };
+        delete next.durationSeconds;
+        return next;
+      });
+    } catch {
+      showInfoToast('Không thể tự đọc thời lượng video. Bạn có thể nhập thủ công.');
+    }
   };
 
   const closeCourseModal = () => {
@@ -298,6 +346,37 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
     if (lessonFormSubmitting) return;
     setIsLessonModalOpen(false);
     setLessonFormErrors({});
+    setLessonMediaFile(null);
+    setLessonUploadProgress(0);
+  };
+
+  const uploadSelectedLessonVideo = async () => {
+    if (!lessonMediaFile) {
+      return lessonFormValues.mediaFileId || undefined;
+    }
+
+    const session = await createMediaUploadSession({
+      fileName: lessonMediaFile.name,
+      mimeType: lessonMediaFile.type || 'video/mp4',
+      totalSize: lessonMediaFile.size,
+      chunkSize: MEDIA_CHUNK_SIZE,
+    });
+
+    const totalChunks = Math.ceil(lessonMediaFile.size / MEDIA_CHUNK_SIZE);
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+      const start = chunkIndex * MEDIA_CHUNK_SIZE;
+      const end = Math.min(start + MEDIA_CHUNK_SIZE, lessonMediaFile.size);
+      const chunk = lessonMediaFile.slice(start, end);
+      await uploadMediaChunk(session.uploadId, chunkIndex, chunk);
+      setLessonUploadProgress(Math.round(((chunkIndex + 1) / totalChunks) * 100));
+    }
+
+    const completed = await completeMediaUpload(session.uploadId);
+    if (!completed.mediaFileId) {
+      throw new Error('Không thể hoàn tất upload video.');
+    }
+
+    return completed.mediaFileId;
   };
 
   const handleSubmitCourse = async () => {
@@ -335,12 +414,14 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
     if (!selectedCourse || !validateLessonForm()) return;
     setLessonFormSubmitting(true);
     try {
+      const uploadedMediaFileId = await uploadSelectedLessonVideo();
       const payload = {
         title: lessonFormValues.title.trim(),
         orderIndex: Number(lessonFormValues.orderIndex),
         durationSeconds: Number(lessonFormValues.durationSeconds),
         preview: lessonFormValues.preview,
-        gumletPlaybackUrl: lessonFormValues.gumletPlaybackUrl.trim() || undefined,
+        mediaFileId: uploadedMediaFileId,
+        clearMedia: lessonFormMode === 'edit' && !uploadedMediaFileId && !lessonMediaFile,
       };
 
       if (lessonFormMode === 'create') {
@@ -605,7 +686,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
                     </div>
                   </div>
                   <div className="mt-5 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-slate-500 dark:border-dark-border dark:bg-dark-bg dark:text-slate-400">
-                    Bạn có thể dán link phát video Gumlet cho từng buổi học ở danh sách bên phải. Hệ thống sẽ tự động dùng link đó để phát trong trang học.
+                    Bạn có thể upload video nội bộ cho từng bài học ở danh sách bên phải. Hệ thống sẽ phát video qua backend riêng của dự án.
                   </div>
                 </div>
                 <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-dark-border dark:bg-dark-bg">
@@ -630,7 +711,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
                 <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-dark-border sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 className="text-lg font-bold">Danh sách bài học</h4>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Thêm từng buổi học và dán link phát video Gumlet tại đây.</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Thêm từng buổi học và gắn video nội bộ cho từng bài học tại đây.</p>
                   </div>
                   <button onClick={openCreateLessonModal} className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">
                     <Plus size={18} />
@@ -659,13 +740,17 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
                             <p className="mt-3 font-semibold text-slate-900 dark:text-white">{lesson.title}</p>
                             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                               <span className="flex items-center gap-1"><Video size={14} /> {formatLessonDuration(lesson.durationSeconds)}</span>
-                              {lesson.gumletPlaybackUrl ? (
-                                <span className="flex items-center gap-1 text-emerald-600"><Link2 size={14} /> Đã gắn video Gumlet</span>
+                              {lesson.mediaFileId ? (
+                                lesson.mediaProcessing ? (
+                                  <span className="flex items-center gap-1 text-amber-600"><UploadCloud size={14} /> Đang xử lý video</span>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-emerald-600"><UploadCloud size={14} /> Đã gắn video nội bộ</span>
+                                )
                               ) : (
-                                <span>Chưa có link video</span>
+                                <span>Chưa có video</span>
                               )}
                             </div>
-                            <p className="mt-2 truncate text-xs text-slate-500 dark:text-slate-400">{lesson.gumletPlaybackUrl || 'Bạn chưa dán link phát video Gumlet cho buổi học này.'}</p>
+                            <p className="mt-2 truncate text-xs text-slate-500 dark:text-slate-400">{lesson.mediaFileName || 'Bạn chưa upload video cho bài học này.'}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <button onClick={() => openEditLessonModal(lesson)} className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-primary/10 hover:text-primary"><Edit size={18} /></button>
@@ -748,11 +833,16 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
 
       {isLessonModalOpen && selectedCourse && (
         <div className="fixed inset-0 z-[170] flex items-center justify-center px-4 py-6">
-          <button className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={closeLessonModal} aria-label="Đóng form bài học" />
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:border-dark-border dark:bg-dark-card">
-            <div className="border-b border-gray-100 px-6 py-5 dark:border-dark-border">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white">{lessonFormMode === 'create' ? 'Thêm bài học mới' : 'Cập nhật bài học'}</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Khóa học: {selectedCourse.title}. Bạn có thể dán nguyên link phát video Gumlet cho từng buổi.</p>
+          <button className="absolute inset-0 bg-slate-950/65 backdrop-blur-md" onClick={closeLessonModal} aria-label="Đóng form bài học" />
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/15 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.28)] dark:border-white/10 dark:bg-dark-card">
+            <div className="border-b border-slate-200/70 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_42%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.9))] px-6 py-5 dark:border-dark-border dark:bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_42%),linear-gradient(180deg,rgba(17,24,39,0.96),rgba(15,23,42,0.92))]">
+              <div className="mb-3 inline-flex items-center rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                Lesson Studio
+              </div>
+              <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{lessonFormMode === 'create' ? 'Thêm bài học mới' : 'Cập nhật bài học'}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Khóa học: <span className="font-semibold text-slate-800 dark:text-white">{selectedCourse.title}</span>
+              </p>
             </div>
             <div className="grid grid-cols-1 gap-5 px-6 py-6 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
@@ -767,14 +857,35 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({ onNavigate, role }) => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Thời lượng (giây) *</label>
-                <input type="number" value={lessonFormValues.durationSeconds} onChange={(event) => setLessonFormValues((prev) => ({ ...prev, durationSeconds: event.target.value }))} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-bg dark:text-white" />
+                <input type="number" value={lessonFormValues.durationSeconds} onChange={(event) => setLessonFormValues((prev) => ({ ...prev, durationSeconds: event.target.value }))} placeholder="Tự động lấy từ video đã chọn" className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-bg dark:text-white" />
                 {lessonFormErrors.durationSeconds && <p className="text-sm text-red-500">{lessonFormErrors.durationSeconds}</p>}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Link phát video Gumlet</label>
-                <input value={lessonFormValues.gumletPlaybackUrl} onChange={(event) => setLessonFormValues((prev) => ({ ...prev, gumletPlaybackUrl: event.target.value }))} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-bg dark:text-white" placeholder="https://play.gumlet.io/embed/..." />
-                <p className="text-xs text-slate-500 dark:text-slate-400">Upload video trên Gumlet trước, sau đó dán playback URL hoặc embed URL vào đây.</p>
-                {lessonFormErrors.gumletPlaybackUrl && <p className="text-sm text-red-500">{lessonFormErrors.gumletPlaybackUrl}</p>}
+                <div className="rounded-[1.75rem] border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm dark:border-white/10 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950/70">
+                  <div className="mb-3">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">File video nội bộ</label>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Chọn video nguồn cho bài học. Hệ thống sẽ tự nhận diện thời lượng trước khi lưu.</p>
+                  </div>
+                  <input type="file" accept="video/*" onChange={(event) => void handleLessonMediaFileChange(event.target.files?.[0] || null)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-all file:mr-4 file:rounded-xl file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:font-semibold file:text-primary hover:file:bg-primary/15 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-bg dark:text-white dark:file:bg-primary/15" />
+                </div>
+                {lessonFormValues.mediaFileId ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300">
+                    Video hiện tại: {courseLessons.find((lesson) => lesson.id === editingLessonId)?.mediaFileName || 'Đã gắn video'}
+                    <button
+                      type="button"
+                      onClick={() => setLessonFormValues((prev) => ({ ...prev, mediaFileId: '' }))}
+                      className="ml-3 font-semibold underline"
+                    >
+                      Gỡ video
+                    </button>
+                  </div>
+                ) : null}
+                {lessonMediaFile ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Đã chọn: {lessonMediaFile.name} {lessonUploadProgress > 0 ? `(${lessonUploadProgress}%)` : ''}</p>
+                ) : null}
+                {!lessonMediaFile && editingLessonId && courseLessons.find((lesson) => lesson.id === editingLessonId)?.mediaProcessing ? (
+                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Video hiện tại đang được xử lý nền để tối ưu phát HLS.</p>
+                ) : null}
               </div>
               <div className="flex items-center gap-3 md:col-span-2">
                 <input id="preview-lesson" type="checkbox" checked={lessonFormValues.preview} onChange={(event) => setLessonFormValues((prev) => ({ ...prev, preview: event.target.checked }))} className="size-4 rounded border-gray-300 text-primary focus:ring-primary" />
