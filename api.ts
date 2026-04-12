@@ -107,7 +107,21 @@ export type LessonDto = {
   orderIndex: number;
   durationSeconds: number;
   preview: boolean;
-  gumletPlaybackUrl?: string | null;
+  mediaFileId?: string | null;
+  mediaFileName?: string | null;
+  mediaProcessing?: boolean;
+  hlsReady?: boolean;
+  videoPlaybackUrl?: string | null;
+};
+
+export type MediaUploadSessionDto = {
+  uploadId: string;
+  status: string;
+  totalSize: number;
+  chunkSize: number;
+  totalChunks: number;
+  uploadedChunks: number;
+  mediaFileId?: string | null;
 };
 
 export type TransactionDto = {
@@ -195,7 +209,7 @@ export async function adminCreateLesson(courseId: string, payload: {
   orderIndex: number;
   durationSeconds: number;
   preview: boolean;
-  gumletPlaybackUrl?: string;
+  mediaFileId?: string;
 }) {
   return request<LessonDto>(`/api/courses/${courseId}/lessons`, {
     method: 'POST',
@@ -208,7 +222,8 @@ export async function adminUpdateLesson(lessonId: string, payload: {
   orderIndex?: number;
   durationSeconds?: number;
   preview?: boolean;
-  gumletPlaybackUrl?: string;
+  mediaFileId?: string;
+  clearMedia?: boolean;
 }) {
   return request<LessonDto>(`/api/lessons/${lessonId}`, {
     method: 'PUT',
@@ -219,6 +234,61 @@ export async function adminUpdateLesson(lessonId: string, payload: {
 export async function adminDeleteLesson(lessonId: string) {
   return request<void>(`/api/lessons/${lessonId}`, {
     method: 'DELETE',
+  });
+}
+
+export async function createMediaUploadSession(payload: {
+  fileName: string;
+  mimeType: string;
+  totalSize: number;
+  chunkSize: number;
+}) {
+  return request<MediaUploadSessionDto>('/api/media/uploads', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadMediaChunk(uploadId: string, chunkIndex: number, chunk: Blob) {
+  const formData = new FormData();
+  formData.append('chunk', chunk, `chunk-${chunkIndex}.part`);
+
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  beginRequest();
+  try {
+    const response = await fetch(`${API_BASE}/api/media/uploads/${uploadId}/chunks/${chunkIndex}`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let message = 'Da xay ra loi, vui long thu lai.';
+      try {
+        const errorBody = await response.json();
+        if (errorBody?.message) {
+          message = errorBody.message;
+        }
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
+
+    return response.json() as Promise<MediaUploadSessionDto>;
+  } finally {
+    endRequest();
+  }
+}
+
+export async function completeMediaUpload(uploadId: string) {
+  return request<MediaUploadSessionDto>(`/api/media/uploads/${uploadId}/complete`, {
+    method: 'POST',
   });
 }
 

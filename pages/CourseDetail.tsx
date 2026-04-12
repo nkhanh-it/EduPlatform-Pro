@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { getCourse, getCourseLessons, getMyEnrollments, getSelectedCourseId, setSelectedCourseId, setSelectedLessonId } from '../api';
+import ProtectedVideoPlayer from '../components/ProtectedVideoPlayer';
 import { Course, Enrollment, Lesson } from '../types';
 import { showErrorToast } from '../components/feedback/ToastProvider';
 
@@ -91,7 +92,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
   const firstLesson = lessons[0] || null;
   const previewLesson = lessons.find((lesson) => lesson.preview) || firstLesson;
   const activePreviewLesson = lessons.find((lesson) => lesson.id === previewLessonId) || null;
-  const canPreview = Boolean(previewLesson?.preview && previewLesson.gumletPlaybackUrl);
+  const canPreview = Boolean(previewLesson?.preview && previewLesson.videoPlaybackUrl);
 
   const heroDescription = useMemo(() => {
     if (course?.description?.trim()) {
@@ -155,7 +156,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
   const secondaryActionLabel = isEnrolled ? 'Xem bài học' : 'Xem nội dung khóa học';
 
   const openPreviewLesson = (lesson: Lesson | null) => {
-    if (!lesson?.preview || !lesson.gumletPlaybackUrl) {
+    if (!lesson?.preview || !lesson.videoPlaybackUrl) {
       return;
     }
     setPreviewLessonId(lesson.id);
@@ -372,7 +373,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
                           {lesson.preview ? (
                             <span className="rounded-full bg-emerald-500/10 px-2 py-1 font-semibold text-emerald-600 dark:text-emerald-400">Xem thử</span>
                           ) : null}
-                          {lesson.preview && lesson.gumletPlaybackUrl ? (
+                          {lesson.preview && lesson.videoPlaybackUrl ? (
                             <button
                               onClick={() => openPreviewLesson(lesson)}
                               className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-dark-card dark:text-emerald-300"
@@ -422,7 +423,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
         </section>
       </main>
 
-      {activePreviewLesson?.gumletPlaybackUrl ? (
+      {activePreviewLesson?.videoPlaybackUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
           <button onClick={() => setPreviewLessonId(null)} className="absolute inset-0" aria-label="Đóng preview" />
           <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-2xl">
@@ -439,12 +440,10 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ onNavigate }) => {
               </button>
             </div>
             <div className="relative aspect-video bg-black">
-              <iframe
+              <ProtectedVideoPlayer
                 className="absolute inset-0 h-full w-full"
-                src={activePreviewLesson.gumletPlaybackUrl}
+                src={activePreviewLesson.videoPlaybackUrl}
                 title={activePreviewLesson.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
               />
             </div>
           </div>

@@ -20,6 +20,7 @@ import {
   setSelectedLessonId,
   updateEnrollmentProgress,
 } from '../api';
+import ProtectedVideoPlayer from '../components/ProtectedVideoPlayer';
 import { Course, Enrollment, Lesson } from '../types';
 
 interface CoursePlayerProps {
@@ -32,9 +33,9 @@ const formatDuration = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
-const getGumletEmbedUrl = (lesson: Lesson | null) => {
+const getPlaybackUrl = (lesson: Lesson | null) => {
   if (!lesson) return null;
-  const rawUrl = lesson.gumletPlaybackUrl?.trim();
+  const rawUrl = lesson.videoPlaybackUrl?.trim();
   return rawUrl || null;
 };
 
@@ -111,7 +112,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
 
   const activeLessonIndex = lessons.findIndex((lesson) => lesson.id === activeLessonId);
   const activeLesson = activeLessonIndex >= 0 ? lessons[activeLessonIndex] : null;
-  const activeLessonEmbedUrl = getGumletEmbedUrl(activeLesson);
+  const activeLessonEmbedUrl = getPlaybackUrl(activeLesson);
   const completedCount = completedLessonIds.length;
   const totalLessons = lessons.length || enrollment?.totalLessons || 0;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
@@ -219,20 +220,13 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
             <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
               {activeLessonEmbedUrl ? (
                 <>
-                  <iframe
+                  <ProtectedVideoPlayer
                     key={activeLesson.id}
-                    className="absolute inset-0 h-full w-full"
                     src={activeLessonEmbedUrl}
                     title={activeLesson?.title || course?.title || 'Course video player'}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
+                    className="absolute inset-0 h-full w-full"
                   />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
-                  <div className="absolute bottom-4 right-4">
-                    <button onClick={handleCompleteAndNext} className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover">
-                      {isCompleted(activeLesson?.id || '') ? 'Bài đã hoàn thành' : 'Đánh dấu hoàn thành'}
-                    </button>
-                  </div>
                 </>
               ) : (
                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${course?.thumbnail || 'https://picsum.photos/seed/code/1920/1080'})` }}>
@@ -245,9 +239,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
                         {activeLesson ? `Thời lượng ${formatDuration(activeLesson.durationSeconds)}` : 'Nội dung bài học đang được cập nhật.'}
                       </p>
                     </div>
-                    <button onClick={handleCompleteAndNext} className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover">
-                      {isCompleted(activeLesson?.id || '') ? 'Bài đã hoàn thành' : 'Đánh dấu hoàn thành'}
-                    </button>
                   </div>
                 </div>
               )}
@@ -355,7 +346,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ onNavigate }) => {
                         <div className="mt-1 flex items-center gap-2">
                           <PlayCircle size={14} className={isActive ? 'text-primary/70' : 'text-slate-400'} />
                           <span className="text-xs text-slate-500">{formatDuration(lesson.durationSeconds)}</span>
-                          {lesson.gumletPlaybackUrl && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">Gumlet</span>}
+                          {lesson.videoPlaybackUrl && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">Video</span>}
                           {lesson.preview && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Preview</span>}
                           {isActive && <span className="ml-auto rounded bg-primary px-1.5 text-[10px] text-white">Đang học</span>}
                         </div>

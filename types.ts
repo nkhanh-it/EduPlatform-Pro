@@ -57,7 +57,11 @@ export interface Lesson {
   orderIndex: number;
   durationSeconds: number;
   preview: boolean;
-  gumletPlaybackUrl?: string | null;
+  mediaFileId?: string | null;
+  mediaFileName?: string | null;
+  mediaProcessing?: boolean;
+  hlsReady?: boolean;
+  videoPlaybackUrl?: string | null;
 }
 
 export interface Stat {
