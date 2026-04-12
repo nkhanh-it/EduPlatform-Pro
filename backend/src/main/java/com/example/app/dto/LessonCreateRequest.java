@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.UUID;
+
 public class LessonCreateRequest {
 
     @NotBlank
@@ -18,7 +20,7 @@ public class LessonCreateRequest {
 
     private boolean preview;
 
-    private String gumletPlaybackUrl;
+    private UUID mediaFileId;
 
     public String getTitle() {
         return title;
@@ -52,11 +54,11 @@ public class LessonCreateRequest {
         this.preview = preview;
     }
 
-    public String getGumletPlaybackUrl() {
-        return gumletPlaybackUrl;
+    public UUID getMediaFileId() {
+        return mediaFileId;
     }
 
-    public void setGumletPlaybackUrl(String gumletPlaybackUrl) {
-        this.gumletPlaybackUrl = gumletPlaybackUrl;
+    public void setMediaFileId(UUID mediaFileId) {
+        this.mediaFileId = mediaFileId;
     }
 }
