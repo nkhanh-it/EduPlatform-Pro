@@ -3,10 +3,10 @@ server:
 
 spring:
   datasource:
-    url: "jdbc:postgresql://db.pbdolgaaoqsbkckgudoi.supabase.co:5432/postgres?sslmode=require"
+    url: "jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require"
     driver-class-name: org.postgresql.Driver
-    username: "postgres"
-    password: '2_@LVAW/fqm-kGS'
+    username: "postgres.pbdolgaaoqsbkckgudoi"
+    password: "6uyuHl7ToknizLhm"
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,20 +17,32 @@ spring:
     open-in-view: false
   jackson:
     time-zone: Asia/Ho_Chi_Minh
+  servlet:
+    multipart:
+      max-file-size: 2048MB
+      max-request-size: 2048MB
 
 app:
   jwt:
-    secret: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
+    secret: "temporary-jwt-secret-for-local-dev-256-bits-minimum"
     expiration-minutes: 120
     refresh-expiration-days: 30
   payment:
-    frontend-return-url: ${APP_PAYMENT_VNPAY_FRONTEND_RETURN_URL:http://localhost:3000/checkout}
+    frontend-return-url: "http://localhost:3000/checkout"
     vnpay:
-      enabled: ${APP_PAYMENT_VNPAY_ENABLED:false}
-      tmn-code: ${APP_PAYMENT_VNPAY_TMN_CODE:}
-      hash-secret: ${APP_PAYMENT_VNPAY_HASH_SECRET:}
-      payment-url: ${APP_PAYMENT_VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-      return-url: ${APP_PAYMENT_VNPAY_RETURN_URL:http://localhost:8080/api/payments/vnpay/return}
+      enabled: true
+      tmn-code: "A9X5ERR5"
+      hash-secret: "AVLL44R5RHHH16CPSEIURTVZ8TAOPCF6"
+      payment-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+      return-url: "http://localhost:8080/api/payments/vnpay/return"
+  media:
+    storage-root: "./data/media-private"
+    public-base-url: "http://localhost:8080"
+    chunk-size-bytes: 5242880
+    max-file-size-bytes: 2147483648
+    playback-token-minutes: 20
+    ffmpeg-path: "C:/Users/Khanh/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.1-full_build/bin/ffmpeg.exe"
+    hls-segment-seconds: 6
 
 logging:
   level:
